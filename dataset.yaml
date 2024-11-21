@@ -1,0 +1,5 @@
+train: C:\Users\anoca\Desktop\FCUP\MDS-1ºano\VC\dataset\images\train
+val: C:\Users\anoca\Desktop\FCUP\MDS-1ºano\VC\dataset\images\val
+
+nc: 5
+names: ['circle', 'hours', 'minutes', 'seconds', 'center']
