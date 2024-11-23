@@ -7,11 +7,12 @@ class_mapping = {
     "hours": 1,
     "minutes": 2,
     "seconds": 3,
-    "center": 4
+    "center": 4,
+    "12":5
 }
 
 # Diretório contendo os arquivos XML
-input_dir = r"C:\Users\anoca\Desktop\FCUP\MDS-1ºano\VC\dataset\images\val"
+input_dir = r"C:\Users\anoca\Desktop\FCUP\MDS-1ºano\VC\dataset\images\train"
 
 def convert_xml_to_yolo(xml_file, output_file):
     tree = ET.parse(xml_file)
