@@ -8,11 +8,11 @@ class_mapping = {
     "minutes": 2,
     "seconds": 3,
     "center": 4,
-    "12":5
+    "12": 5
 }
 
 # Diretório contendo os arquivos XML
-input_dir = r"C:\Users\anoca\Desktop\FCUP\MDS-1ºano\VC\dataset\images\train"
+input_dir = r"C:\Users\anoca\Documents\GitHub\analogic-watch-detector\dataset\images\train"
 
 def convert_xml_to_yolo(xml_file, output_file):
     tree = ET.parse(xml_file)
@@ -49,5 +49,12 @@ for filename in os.listdir(input_dir):
         txt_filename = os.path.splitext(filename)[0] + ".txt"
         txt_path = os.path.join(input_dir, txt_filename)
         
-        convert_xml_to_yolo(xml_path, txt_path)
-        print(f"Convertido: {xml_path} -> {txt_path}")
+        try:
+            convert_xml_to_yolo(xml_path, txt_path)
+            print(f"Convertido: {xml_path} -> {txt_path}")
+            
+            # Apagar o arquivo XML após a conversão
+            os.remove(xml_path)
+            print(f"Arquivo XML apagado: {xml_path}")
+        except Exception as e:
+            print(f"Erro ao processar {xml_path}: {e}")
