@@ -27,8 +27,8 @@ def calculate_angle(center, point, reference_point):
     
     return angle
 
-def draw_clock_hands(image_path, center_point, hours_point, minutes_point, number_12_point, hour_angle, minute_angle, calculated_hours, calculated_minutes):
-    """Draw clock hands and reference points on the image"""
+def draw_clock(image_path, center_point, hours_point, minutes_point, number_12_point, hour_angle, minute_angle, calculated_hours, calculated_minutes):
+    """Draw clock and reference points on the image"""
     # Ler a imagem
     img = cv2.imread(image_path)
     
@@ -56,10 +56,10 @@ def draw_clock_hands(image_path, center_point, hours_point, minutes_point, numbe
                 (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
     
     # Salvar e mostrar a imagem
-    cv2.imwrite('clock_with_hands.jpg', img)
+    cv2.imwrite('clock_final.jpg', img)
     
     # Mostrar a imagem
-    cv2.imshow('Clock with hands', img)
+    cv2.imshow('Clock Final', img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
@@ -101,4 +101,4 @@ print(f"Time: {hours:02d}:{minutes:02d}")
 
 # Chamar a função de desenho
 image_path = "watch_test3.jpg"  # Substitua pelo caminho correto da sua imagem
-draw_clock_hands(image_path, center_point, hours_point, minutes_point, number_12_point, hour_angle, minute_angle, hours, minutes)
+draw_clock(image_path, center_point, hours_point, minutes_point, number_12_point, hour_angle, minute_angle, hours, minutes)
