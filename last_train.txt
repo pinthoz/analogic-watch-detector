@@ -1,0 +1,9 @@
+Model summary (fused): 168 layers, 3,006,818 parameters, 0 gradients, 8.1 GFLOPs
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100%|██████████| 2/2 [00:12<00:00,  6.30s/it]
+                   all         50        275      0.651      0.727      0.696      0.427
+                circle         49         49      0.965          1      0.995      0.837
+                 hours         49         49      0.627      0.714      0.743      0.431
+               minutes         49         49      0.814      0.895      0.929      0.591
+               seconds         35         35       0.43      0.518      0.423      0.221
+                center         50         50      0.551      0.515      0.422      0.149
+                    12         43         43      0.522      0.721      0.664      0.332

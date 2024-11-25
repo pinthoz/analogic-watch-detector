@@ -1,77 +1,104 @@
-import cv2
+import json
 import math
-from ultralytics import YOLO
+import cv2
+import numpy as np
 
-# Funções para calcular o ângulo
-def get_angle(p1, p2):
-    angle = math.atan2(p1[1] - p2[1], p1[0] - p2[0])
-    if angle < 0:
-        angle += 2 * math.pi
-    angle *= 180 / math.pi  # Para graus
-    # Ajustar o ponto de 0 graus de direita para cima
-    if angle <= 270:
-        angle += 90
-    else:
-        angle -= 270
+def get_box_center(box):
+    """Calculate the center point of a bounding box"""
+    x = (box[0] + box[2]) / 2
+    y = (box[1] + box[3]) / 2
+    return (x, y)
+
+def calculate_angle(center, point, reference_point):
+    """Calculate angle between two points relative to 12 o'clock position"""
+    # Calculate vectors
+    ref_vector = (reference_point[0] - center[0], reference_point[1] - center[1])
+    point_vector = (point[0] - center[0], point[1] - center[1])
+    
+    # Calculate angles from vectors
+    ref_angle = math.atan2(ref_vector[1], ref_vector[0])
+    point_angle = math.atan2(point_vector[1], point_vector[0])
+    
+    # Calculate relative angle in degrees
+    angle = math.degrees(point_angle - ref_angle)
+    
+    # Normalize angle to 0-360 range
+    angle = (angle + 360) % 360
+    
     return angle
 
-def distance_between_points(p1, p2):
-    return math.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
+def draw_clock_hands(image_path, center_point, hours_point, minutes_point, number_12_point, hour_angle, minute_angle, calculated_hours, calculated_minutes):
+    """Draw clock hands and reference points on the image"""
+    # Ler a imagem
+    img = cv2.imread(image_path)
+    
+    # Converter pontos para inteiros (OpenCV requer coordenadas em int)
+    center = (int(center_point[0]), int(center_point[1]))
+    hours = (int(hours_point[0]), int(hours_point[1]))
+    minutes = (int(minutes_point[0]), int(minutes_point[1]))
+    twelve = (int(number_12_point[0]), int(number_12_point[1]))
+    
+    # Desenhar pontos de referência
+    cv2.circle(img, center, 3, (0, 0, 255), -1)  # Centro em vermelho
+    cv2.circle(img, twelve, 3, (255, 0, 0), -1)  # Ponto 12 em azul
+    
+    # Desenhar linhas dos ponteiros
+    cv2.line(img, center, hours, (0, 0, 255), 2)     # Ponteiro das horas em vermelho
+    cv2.line(img, center, minutes, (255, 0, 0), 2)   # Ponteiro dos minutos em azul
+    cv2.line(img, center, twelve, (0, 255, 0), 1)    # Linha de referência (12h) em verde
+    
+    # Desenhar texto com informações
+    cv2.putText(img, f"Hour angle: {hour_angle:.1f}", 
+                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
+    cv2.putText(img, f"Minute angle: {minute_angle:.1f}", 
+                (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
+    cv2.putText(img, f"Time: {int(calculated_hours):02d}:{int(calculated_minutes):02d}", 
+                (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
+    
+    # Salvar e mostrar a imagem
+    cv2.imwrite('clock_with_hands.jpg', img)
+    
+    # Mostrar a imagem
+    cv2.imshow('Clock with hands', img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
+# Leitura do JSON
+with open("detections3.json", "r") as f:
+    data = json.load(f)
 
-# Carregue o modelo YOLO treinado
-model = YOLO("clock_model.pt")  # Substitua pelo caminho do modelo treinado
+# Extract centers for each component
+boxes_dict = {box['class_name']: box['box'] for box in data[0]}
 
-# Carregue a imagem
-image_path = "2.jpg"
-src = cv2.imread(image_path)
+# Calculate centers
+center_point = get_box_center(boxes_dict['center'])
+hours_point = get_box_center(boxes_dict['hours'])
+minutes_point = get_box_center(boxes_dict['minutes'])
+number_12_point = get_box_center(boxes_dict['12'])
 
-if src is None:
-    print("Nenhuma imagem carregada.")
-    exit(-1)
+# Calculate clock radius
+circle_box = boxes_dict['circle']
+circle_radius = ((circle_box[2] - circle_box[0]) + (circle_box[3] - circle_box[1])) / 4
 
-# Realize a detecção com o modelo YOLO
-results = model.predict(source=src, conf=0.5, save=False)
+# Calculate raw angles relative to 12 o'clock position
+hour_angle = calculate_angle(center_point, hours_point, number_12_point)
+minute_angle = calculate_angle(center_point, minutes_point, number_12_point)
 
-# Extraia as detecções
-circle = None
-hands = []
-for result in results[0].boxes:
-    cls = int(result.cls)  # Classe da detecção
-    x1, y1, x2, y2 = map(int, result.xyxy[0])  # Coordenadas do retângulo
+# Convert angles to time
+hours = (hour_angle / 30)  # Each hour is 30 degrees
+minutes = (minute_angle / 6)  # Each minute is 6 degrees
 
-    if cls == 0:  # Círculo
-        center = ((x1 + x2) // 2, (y1 + y2) // 2)
-        radius = distance_between_points((x1, y1), (x2, y2)) // 2
-        circle = (center, radius)
-    else:  # Ponteiros
-        hands.append(((x1 + x2) // 2, (y1 + y2) // 2, cls))  # cls identifica o tipo de ponteiro
+# Round to nearest hour/minute
+hours = round(hours) % 12
+if hours == 0:
+    hours = 12
+minutes = round(minutes) % 60
 
-# Desenhar os resultados
-cdst = src.copy()
-if circle:
-    center, radius = circle
-    cv2.circle(cdst, center, 3, (0, 255, 0), -1)
-    cv2.circle(cdst, center, int(radius), (0, 0, 255), 3)
+print(f"Clock center: {center_point}")
+print(f"Hour angle: {hour_angle:.1f}°")
+print(f"Minute angle: {minute_angle:.1f}°")
+print(f"Time: {hours:02d}:{minutes:02d}")
 
-# Ordenar os ponteiros por comprimento
-hands.sort(key=lambda h: distance_between_points(h[:2], center))
-
-# Classificar os ponteiros e desenhar
-colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]  # Azul: hora, Verde: minutos, Vermelho: segundos
-labels = ["Hora", "Minutos", "Segundos"]
-angles = []
-
-for i, hand in enumerate(hands):
-    hand_pos, cls = hand[:2], hand[2]
-    cv2.line(cdst, center, hand_pos, colors[i], 3)
-    angle = get_angle(hand_pos, center)
-    angles.append(angle)
-    print(f"{labels[i]}: {angle // (30 if i == 0 else 6)}")
-
-# Exibir resultados
-cv2.imshow("Fonte", src)
-cv2.imshow("Detecção", cdst)
-cv2.waitKey(0)
-cv2.imwrite("detected_output.jpg", cdst)
-cv2.destroyAllWindows()
+# Chamar a função de desenho
+image_path = "watch_test3.jpg"  # Substitua pelo caminho correto da sua imagem
+draw_clock_hands(image_path, center_point, hours_point, minutes_point, number_12_point, hour_angle, minute_angle, hours, minutes)
