@@ -94,46 +94,43 @@ def process_clock_time(json_path, image_path):
     with open(json_path, "r") as f:
         data = json.load(f)
 
-    # Extract centers for each component
-    try:
-        boxes_dict = {box['class_name']: box['box'] for box in data[0]}
-    except (KeyError, IndexError):
-        print("Error: Invalid JSON structure. Unable to extract bounding boxes.")
-        return None
+    # Organize detections by class_name and select the one with highest confidence for each class
+    detections_by_class = {}
+    for detection in data[0]:
+        class_name = detection['class_name']
+        if class_name not in detections_by_class or detection['confidence'] > detections_by_class[class_name]['confidence']:
+            detections_by_class[class_name] = detection
 
     # Validate required keys
     required_keys = ['hours', 'minutes', '12', 'circle']
     for key in required_keys:
-        if key not in boxes_dict:
+        if key not in detections_by_class:
             print(f"Error: Missing required key '{key}' in detection data.")
             return None
 
     # Calculate circle center
-    circle_box_point = get_box_center(boxes_dict['circle'])
+    circle_box_point = get_box_center(detections_by_class['circle']['box'])
     
     # Determine center point: use 'center' if exists, otherwise use circle center
-    if 'center' in boxes_dict:
-        center_point = get_box_center(boxes_dict['center'])
+    if 'center' in detections_by_class:
+        center_point = get_box_center(detections_by_class['center']['box'])
     else:
         center_point = circle_box_point
 
-    hours_point = get_box_center(boxes_dict['hours'])
-    minutes_point = get_box_center(boxes_dict['minutes'])
-    number_12_point = get_box_center(boxes_dict['12'])
+    hours_point = get_box_center(detections_by_class['hours']['box'])
+    minutes_point = get_box_center(detections_by_class['minutes']['box'])
+    number_12_point = get_box_center(detections_by_class['12']['box'])
 
     # Try to get seconds point with highest confidence
     seconds_point = None
     seconds_angle = None
     calculated_seconds = 0
 
-    # Find the seconds detection with highest confidence
-    seconds_detections = [box for box in data[0] if box['class_name'] == 'seconds']
-    if seconds_detections:
-        highest_conf_seconds = max(seconds_detections, key=lambda x: x['confidence'])
-        seconds_point = get_box_center(highest_conf_seconds['box'])
+    if 'seconds' in detections_by_class:
+        seconds_point = get_box_center(detections_by_class['seconds']['box'])
 
     # Calculate clock radius
-    circle_box = boxes_dict['circle']
+    circle_box = detections_by_class['circle']['box']
     circle_radius = ((circle_box[2] - circle_box[0]) + (circle_box[3] - circle_box[1])) / 4
 
     # Calculate raw angles relative to 12 o'clock position
@@ -197,10 +194,10 @@ def main():
     parser = argparse.ArgumentParser(description='Clock Time Detection from Image')
     parser.add_argument('-j', '--json', 
                         help='Path to JSON detection file', 
-                        default='detections/detections6.json')
+                        default='detections/detections7.json')
     parser.add_argument('-i', '--image', 
                         help='Path to clock image', 
-                        default='examples/watch_test6.jpg')
+                        default='examples/watch_test7.jpg')
     
     # Parse arguments
     args = parser.parse_args()

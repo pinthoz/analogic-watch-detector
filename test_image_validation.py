@@ -17,35 +17,46 @@ class ClockImageValidator:
         # Convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
+        #cv2.imwrite('image_gray.jpg', gray)
+        
         # Crop the center region (reduce noise from the external areas)
         h, w = gray.shape
         cropped = gray[h // 4:h * 3 // 4, w // 4:w * 3 // 4]
 
         # Apply Bilateral Filter and Gaussian Blur
         blurred = cv2.bilateralFilter(cropped, 9, 75, 75)
+        
+        #cv2.imwrite('image_test.jpg', blurred)
+        
         blurred = cv2.GaussianBlur(blurred, (5, 5), 0)
         
         # Apply Canny Edge Detection
         edges = cv2.Canny(blurred, 50, 150)
+
+        #cv2.imwrite('image_test.jpg', edges)
         
         if self.debug:
             cv2.imwrite('cropped_edges.jpg', edges)
+            
         
         # Circle Hough Transform
         circles = cv2.HoughCircles(
             edges, 
             cv2.HOUGH_GRADIENT, 
             dp=1.2, 
-            minDist=30, 
+            minDist=50, 
             param1=50, 
             param2=40, 
             minRadius=50, 
             maxRadius=150
         )
         
+        
         if circles is not None:
+            #print(circles)
             # Select the circle closest to the center of the cropped region
             circles = np.uint16(np.around(circles))
+            #print(circles)
             center_crop = (cropped.shape[1] // 2, cropped.shape[0] // 2)
             best_circle = min(circles[0, :], key=lambda c: self._distance_point_to_point((c[0], c[1]), center_crop))
             
@@ -94,7 +105,7 @@ class ClockImageValidator:
                 line_center_dist = self._distance_point_to_point((x1, y1), center)
                 
                 # Check if either line endpoint is close to the center
-                if line_center_dist < 50:  # Adjust threshold as needed
+                if line_center_dist < 0.8 * self._distance_point_to_point((x2, y2), center):  
                     valid_lines.append(line)
             
             if self.debug:
@@ -151,11 +162,11 @@ class ClockImageValidator:
 
 def main():
     validator = ClockImageValidator(debug=True)
-    image_path = "examples/watch_test.jpg"
+    image_path = "examples/watch_test7.jpg"
     is_valid_clock = validator.validate_clock_image(image_path)
 
     if is_valid_clock:
-        print("Valid image! Processing...")
+        print("Valid image!")
     else:
         print("Invalid image. Not a clock.")
 
