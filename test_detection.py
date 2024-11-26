@@ -20,7 +20,7 @@ class ClockDetector:
         self.model = model
         self.logger = logger or logging.getLogger(__name__)
     
-    def detect(self, image_path: str, output_dir: str = 'data/output'):
+    def detect(self, image_path: str, output_dir: str = 'examples/output'):
         """
         Realiza detecção em uma imagem
         
@@ -98,9 +98,9 @@ class ClockDetector:
         
         return detections
     
-    def save_detections(self, detections: List[Dict], output_file: str = 'detections.json'):
+    def save_detections(self, detections: List[Dict], output_file: str = 'detections4.json'):
         """
-        Salva detecções em arquivo JSON
+        Salva as detecções em arquivo JSON
         
         Args:
             detections (List[Dict]): Lista de detecções
