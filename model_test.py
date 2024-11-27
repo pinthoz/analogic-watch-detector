@@ -27,7 +27,7 @@ def get_latest_train_dir(base_path="runs/detect"):
     latest_train = max(train_dirs, key=get_train_number)
     return os.path.join(base_path, latest_train)
 
-def save_detections(results, output_file="detections/detections7.json"):
+def save_detections(results, output_file="detections/detection_nuno_l.json"):
     """
     Salva as detecções em um arquivo JSON
     
@@ -68,7 +68,7 @@ def save_detections(results, output_file="detections/detections7.json"):
     print(f"Detecções salvas em: {output_file}")
     return detections
 
-def load_detections(input_file="detections/detections7.json"):
+def load_detections(input_file="detections/detection_nuno_l.json"):
     """
     Carrega as detecções de um arquivo JSON
     
@@ -86,8 +86,8 @@ def load_detections(input_file="detections/detections7.json"):
 model_path = os.path.join(get_latest_train_dir(), "weights/best.pt")
 model = YOLO(model_path)
 
-image_path = "examples/watch_test7.jpg"
-output_path = "examples/output7.jpg"
+image_path = "examples/l.jpg"
+output_path = "examples/watch_nuno_final.jpg"
 
 # Fazer o predict
 results = model.predict(source=image_path, save=True, save_txt=False, conf = 0.5)

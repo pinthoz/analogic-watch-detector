@@ -194,10 +194,10 @@ def main():
     parser = argparse.ArgumentParser(description='Clock Time Detection from Image')
     parser.add_argument('-j', '--json', 
                         help='Path to JSON detection file', 
-                        default='detections/detections7.json')
+                        default='detections/detection_nuno_omega.json')
     parser.add_argument('-i', '--image', 
                         help='Path to clock image', 
-                        default='examples/watch_test7.jpg')
+                        default='examples/watch_nuno_omega.jpg')
     
     # Parse arguments
     args = parser.parse_args()
