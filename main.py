@@ -1,224 +1,206 @@
-import json
+import os
+import sys
 import math
 import cv2
-import numpy as np
-import argparse
-import sys
-import os
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
+from PIL import Image, ImageTk
+import json
+import time
+from utils.detections_utils import run_detection, load_detections
+from utils.clock_utils import draw_clock, get_box_center, calculate_angle, process_clock_time
 
-def get_box_center(box):
-    """Calculate the center point of a bounding box"""
-    x = (box[0] + box[2]) / 2
-    y = (box[1] + box[3]) / 2
-    return (x, y)
 
-def calculate_angle(center, point, reference_point):
-    """Calculate angle between two points relative to 12 o'clock position"""
-    # Calculate vectors
-    ref_vector = (reference_point[0] - center[0], reference_point[1] - center[1])
-    point_vector = (point[0] - center[0], point[1] - center[1])
-    
-    # Calculate angles from vectors
-    ref_angle = math.atan2(ref_vector[1], ref_vector[0])
-    point_angle = math.atan2(point_vector[1], point_vector[0])
-    
-    # Calculate relative angle in degrees
-    angle = math.degrees(point_angle - ref_angle)
-    
-    # Normalize angle to 0-360 range
-    angle = (angle + 360) % 360
-    
-    return angle
+class ClockDetectionApp:
+    def __init__(self, master):
+        self.master = master
+        master.title("Clock Time Detection")
+        master.geometry("1000x700")  # Increased size for better visibility
 
-def draw_clock(image_path, center_point, hours_point, minutes_point, seconds_point, number_12_point, hour_angle, minute_angle, seconds_angle, calculated_hours, calculated_minutes, calculated_seconds):
-    """Draw clock and reference points on the image"""
+        # Style
+        self.style = ttk.Style()
+        self.style.configure("TButton", padding=10, font=('Arial', 10))
+        self.style.configure("TLabel", font=('Arial', 10))
 
-    img = cv2.imread(image_path)
-    
-    # To int
-    center = (int(center_point[0]), int(center_point[1]))
-    hours = (int(hours_point[0]), int(hours_point[1]))
-    minutes = (int(minutes_point[0]), int(minutes_point[1]))
-    seconds = (int(seconds_point[0]), int(seconds_point[1])) if seconds_point else None
-    twelve = (int(number_12_point[0]), int(number_12_point[1]))
-    
-    # Draw the reference points
-    cv2.circle(img, center, 3, (0, 0, 255), -1)  # Centro em vermelho
-    cv2.circle(img, twelve, 3, (255, 0, 0), -1)  # Ponto 12 em azul
-    
-    # Draw the lines
-    cv2.line(img, center, hours, (0, 0, 255), 2)     # Ponteiro das horas em vermelho
-    cv2.line(img, center, minutes, (255, 0, 0), 2)   # Ponteiro dos minutos em azul
-    if seconds:
-        cv2.line(img, center, seconds, (0, 255, 0), 1)   # Ponteiro dos segundos em verde
-    
-    cv2.line(img, center, twelve, (0, 255, 0), 1)    # Linha de referência (12h) em verde
-    
-    # Draw the text
-    cv2.putText(img, f"Hour angle: {hour_angle:.1f}", 
-                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
-    cv2.putText(img, f"Minute angle: {minute_angle:.1f}", 
-                (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
-    
-    if seconds_angle is not None:
-        cv2.putText(img, f"Seconds angle: {seconds_angle:.1f}", 
-                    (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
-        time_text = f"Time: {int(calculated_hours):02d}:{int(calculated_minutes):02d}:{int(calculated_seconds):02d}"
-    else:
-        time_text = f"Time: {int(calculated_hours):02d}:{int(calculated_minutes):02d}"
-    
-    cv2.putText(img, time_text, 
-                (10, 120 if seconds else 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
-    
-    # Salvar e mostrar a imagem
-    output_path = 'clock_final.jpg'
-    cv2.imwrite(output_path, img)
-    print(f"Annotated image saved to {output_path}")
-    
-    # Mostrar a imagem
-    cv2.imshow('Clock Final', img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+        # Top frame for controls
+        control_frame = tk.Frame(master)
+        control_frame.pack(pady=10)
 
-def process_clock_time(json_path, image_path):
-    # Validate input files
-    if not os.path.exists(json_path):
-        print(f"Error: JSON file {json_path} not found.")
-        return None
-    
-    if not os.path.exists(image_path):
-        print(f"Error: Image file {image_path} not found.")
-        return None
+        # Confidence slider
+        tk.Label(control_frame, text="Confidence Threshold:").pack(side=tk.LEFT, padx=(0,10))
+        self.confidence_var = tk.DoubleVar(value=0.5)
+        self.confidence_slider = tk.Scale(control_frame, from_=0.1, to=1.0, resolution=0.1, 
+                                           orient=tk.HORIZONTAL, length=300, 
+                                           variable=self.confidence_var)
+        self.confidence_slider.pack(side=tk.LEFT)
 
-    # JSON
-    with open(json_path, "r") as f:
-        data = json.load(f)
+        # Button frame
+        button_frame = tk.Frame(master)
+        button_frame.pack(pady=10)
 
-    # Organize detections by class_name and select the one with highest confidence for each class
-    detections_by_class = {}
-    for detection in data[0]:
-        class_name = detection['class_name']
-        if class_name not in detections_by_class or detection['confidence'] > detections_by_class[class_name]['confidence']:
-            detections_by_class[class_name] = detection
+        # Buttons
+        self.single_image_button = ttk.Button(button_frame, text="Select Single Image", command=self.process_single_image)
+        self.single_image_button.pack(side=tk.LEFT, padx=10)
 
-    # Validate required keys
-    required_keys = ['hours', 'minutes', '12', 'circle']
-    for key in required_keys:
-        if key not in detections_by_class:
-            print(f"Error: Missing required key '{key}' in detection data.")
-            return None
+        self.folder_button = ttk.Button(button_frame, text="Select Folder", command=self.process_folder)
+        self.folder_button.pack(side=tk.LEFT, padx=10)
 
-    # Calculate circle center
-    circle_box_point = get_box_center(detections_by_class['circle']['box'])
-    
-    # Determine center point: use 'center' if exists, otherwise use circle center
-    if 'center' in detections_by_class:
-        center_point = get_box_center(detections_by_class['center']['box'])
-    else:
-        center_point = circle_box_point
+        # Results frame
+        results_frame = tk.Frame(master)
+        results_frame.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
 
-    hours_point = get_box_center(detections_by_class['hours']['box'])
-    minutes_point = get_box_center(detections_by_class['minutes']['box'])
-    number_12_point = get_box_center(detections_by_class['12']['box'])
+        # Left side for results text
+        results_text_frame = tk.Frame(results_frame)
+        results_text_frame.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
+        
+        self.results_text = tk.Text(results_text_frame, height=20, width=50, wrap=tk.WORD)
+        self.results_text.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
+        
+        results_scrollbar = tk.Scrollbar(results_text_frame, command=self.results_text.yview)
+        results_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.results_text.config(yscrollcommand=results_scrollbar.set)
 
-    # Try to get seconds point with highest confidence
-    seconds_point = None
-    seconds_angle = None
-    calculated_seconds = 0
+        # Right side for images
+        image_frame = tk.Frame(results_frame)
+        image_frame.pack(side=tk.RIGHT, expand=True, fill=tk.BOTH)
 
-    if 'seconds' in detections_by_class:
-        seconds_point = get_box_center(detections_by_class['seconds']['box'])
+        # Original image label
+        self.original_image_label = tk.Label(image_frame, text="Original Image")
+        self.original_image_label.pack()
 
-    # Calculate clock radius
-    circle_box = detections_by_class['circle']['box']
-    circle_radius = ((circle_box[2] - circle_box[0]) + (circle_box[3] - circle_box[1])) / 4
+        # Detection image label
+        self.detection_image_label = tk.Label(image_frame, text="Detection Image")
+        self.detection_image_label.pack()
 
-    # Calculate raw angles relative to 12 o'clock position
-    hour_angle = calculate_angle(center_point, hours_point, number_12_point)
-    minute_angle = calculate_angle(center_point, minutes_point, number_12_point)
+    def process_single_image(self):
+        image_path = filedialog.askopenfilename(
+            title="Select Clock Image", 
+            filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp")]
+        )
+        if image_path:
+            self.process_image(image_path)
 
-    # Calculate seconds angle if seconds point exists
-    if seconds_point:
-        seconds_angle = calculate_angle(center_point, seconds_point, number_12_point)
+    def process_folder(self):
+        folder_path = filedialog.askdirectory(title="Select Folder with Clock Images")
+        if folder_path:
+            image_files = [
+                os.path.join(folder_path, f) for f in os.listdir(folder_path) 
+                if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))
+            ]
+            
+            self.results_text.delete(1.0, tk.END)
+            self.original_image_label.config(image='', text="Original Image")
+            self.detection_image_label.config(image='', text="Detection Image")
+            
+            for image_path in image_files:
+                self.process_image(image_path, append_results=True)
 
-    # Convert angles to time
-    hours = (hour_angle / 30)  # Each hour is 30 degrees
-    minutes = (minute_angle / 6)  # Each minute is 6 degrees
+    def process_image(self, image_path, append_results=False):
+        confidence = self.confidence_var.get()
+        
+        try:
+            # Run detection
+            detections = run_detection(image_path, confidence=confidence)
+            
+            # Process clock time
+            result = process_clock_time(detections, image_path)
+            
+            # Display results
+            result_text = f"Image: {os.path.basename(image_path)}\n"
+            if result:
+                if result['seconds'] is not None:
+                    result_text += f"Time: {result['hours']:02d}:{result['minutes']:02d}:{result['seconds']:02d}\n"
+                else:
+                    result_text += f"Time: {result['hours']:02d}:{result['minutes']:02d}\n"
+            else:
+                result_text += "Time detection failed\n"
+            result_text += "-" * 40 + "\n"
+            
+            if append_results:
+                self.results_text.insert(tk.END, result_text)
+            else:
+                self.results_text.delete(1.0, tk.END)
+                self.results_text.insert(tk.END, result_text)
+            
+            self.results_text.see(tk.END)
+            
+            # Organize detections by class_name
+            detections_by_class = {}
+            for detection in detections[0]:
+                class_name = detection['class_name']
+                if class_name not in detections_by_class or detection['confidence'] > detections_by_class[class_name]['confidence']:
+                    detections_by_class[class_name] = detection
+            
+            # Draw clock visualization
+            if all(key in detections_by_class for key in ['hours', 'minutes', '12', 'circle']):
+                # Calculate points
+                circle_box_point = get_box_center(detections_by_class['circle']['box'])
+                center_point = get_box_center(detections_by_class['center']['box']) if 'center' in detections_by_class else circle_box_point
+                hours_point = get_box_center(detections_by_class['hours']['box'])
+                minutes_point = get_box_center(detections_by_class['minutes']['box'])
+                number_12_point = get_box_center(detections_by_class['12']['box'])
+                
+                # Prepare for drawing
+                seconds_point = get_box_center(detections_by_class['seconds']['box']) if 'seconds' in detections_by_class else None
+                
+                # Calculate angles
+                hour_angle = calculate_angle(center_point, hours_point, number_12_point)
+                minute_angle = calculate_angle(center_point, minutes_point, number_12_point)
+                seconds_angle = calculate_angle(center_point, seconds_point, number_12_point) if seconds_point else None
+                
+                # Draw the clock visualization
+                draw_clock(
+                    image_path, 
+                    center_point, 
+                    hours_point, 
+                    minutes_point, 
+                    seconds_point, 
+                    number_12_point, 
+                    hour_angle, 
+                    minute_angle, 
+                    seconds_angle, 
+                    result['hours'], 
+                    result['minutes'], 
+                    result.get('seconds', 0),
+                    f"{os.path.splitext(os.path.basename(image_path))[0]}_clock.jpg"
+                )
+                
+                # Display the newly drawn clock image
+                clock_final_path = f'results/{os.path.splitext(os.path.basename(image_path))[0]}_clock.jpg'
+                if os.path.exists(clock_final_path):
+                    final_pil_img = Image.open(clock_final_path)
+                    final_pil_img.thumbnail((400, 400))
+                    final_photo = ImageTk.PhotoImage(final_pil_img)
+                    self.original_image_label.config(image=final_photo, text="")
+                    self.original_image_label.image = final_photo
+            
+            # Display detection image (keep existing code)
+            detection_path = f'examples/{os.path.splitext(os.path.basename(image_path))[0]}_detection.jpg'
+            print(f"Attempting to load detection image from: {detection_path}")
+            
+            time.sleep(1)  # Wait for file to be written
+            
+            if os.path.exists(detection_path):
+                print("Detection image found!")
+                detection_pil_img = Image.open(detection_path)
+                detection_pil_img.thumbnail((400, 400))
+                detection_photo = ImageTk.PhotoImage(detection_pil_img)
+                self.detection_image_label.config(image=detection_photo, text="")
+                self.detection_image_label.image = detection_photo
+            else:
+                print(f"Detection image not found at {detection_path}")
+                self.detection_image_label.config(image='', text="No Detection Image")
+            
+        except Exception as e:
+            print(f"Error processing image: {e}")
+            messagebox.showerror("Error", f"An error occurred: {e}")
 
-    # Round to nearest hour/minute
-    hours = round(hours) % 12
-    if hours == 0:
-        hours = 12
-    minutes = round(minutes) % 60
 
-    # Calculate seconds if angle exists
-    if seconds_angle is not None:
-        seconds = (seconds_angle / 6)  # Each second is 6 degrees
-        seconds = round(seconds) % 60
-        calculated_seconds = seconds
-
-    print(f"Clock center: {center_point}")
-    print(f"Hour angle: {hour_angle:.1f}°")
-    print(f"Minute angle: {minute_angle:.1f}°")
-    
-    if seconds_angle is not None:
-        print(f"Seconds angle: {seconds_angle:.1f}°")
-        print(f"Time: {hours:02d}:{minutes:02d}:{calculated_seconds:02d}")
-    else:
-        print(f"Time: {hours:02d}:{minutes:02d}")
-
-    # Call draw_clock with seconds parameters
-    draw_clock(
-        image_path, 
-        center_point, 
-        hours_point, 
-        minutes_point, 
-        seconds_point, 
-        number_12_point, 
-        hour_angle, 
-        minute_angle, 
-        seconds_angle, 
-        hours, 
-        minutes, 
-        calculated_seconds
-    )
-
-    return {
-        'hours': hours,
-        'minutes': minutes,
-        'seconds': calculated_seconds if seconds_angle is not None else None
-    }
 
 def main():
-    # Set up argument parser
-    parser = argparse.ArgumentParser(description='Clock Time Detection from Image')
-    parser.add_argument('-j', '--json', 
-                        help='Path to JSON detection file', 
-                        default='detections/detection_nuno_omega.json')
-    parser.add_argument('-i', '--image', 
-                        help='Path to clock image', 
-                        default='examples/watch_nuno_omega.jpg')
-    
-    # Parse arguments
-    args = parser.parse_args()
-
-    try:
-        # Process the clock time
-        result = process_clock_time(args.json, args.image)
-        
-        if result:
-            print("\nClock Time Detection Completed Successfully!")
-            if result['seconds'] is not None:
-                print(f"Detected Time: {result['hours']:02d}:{result['minutes']:02d}:{result['seconds']:02d}")
-            else:
-                print(f"Detected Time: {result['hours']:02d}:{result['minutes']:02d}")
-        else:
-            print("Clock time detection failed.")
-            sys.exit(1)
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        sys.exit(1)
+    root = tk.Tk()
+    app = ClockDetectionApp(root)
+    root.mainloop()
 
 if __name__ == "__main__":
     main()
