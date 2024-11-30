@@ -12,8 +12,7 @@ Speed: 1.2ms preprocess, 6.9ms inference, 0.0ms loss, 3.0ms postprocess per imag
 
 
 17- yolo11n
-18- yolox8n
-19 - yolov8n-seg
+18- yolov8n
 
 
 Validating runs\detect\train18\weights\best.pt...
