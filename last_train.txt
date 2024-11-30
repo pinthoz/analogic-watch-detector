@@ -1,9 +1,50 @@
+Validating runs\detect\train17\weights\best.pt...
+YOLO11n summary (fused): 238 layers, 2,583,322 parameters, 0 gradients, 6.3 GFLOPs
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100%|██████████| 4/4 [00:02<00:00,  1.62it/s]
+                   all        100        557      0.711      0.702      0.709      0.425
+                circle         99         99       0.99          1      0.994      0.758
+                 hours         99         99      0.844      0.717      0.831      0.484
+               minutes         99         99      0.815      0.899      0.896      0.566
+               seconds         67         67      0.441      0.478      0.447      0.258
+                center        100        100      0.645        0.6      0.574      0.222
+                    12         93         93      0.533      0.516      0.511      0.259
+Speed: 1.2ms preprocess, 6.9ms inference, 0.0ms loss, 3.0ms postprocess per image
+
+
+17- yolo11n
+18- yolox8n
+19 - yolov8n-seg
+
+
+Validating runs\detect\train18\weights\best.pt...
+Ultralytics 8.3.39 🚀 Python-3.8.9 torch-2.2.2+cu118 CUDA:0 (NVIDIA GeForce RTX 2060, 6144MiB)
 Model summary (fused): 168 layers, 3,006,818 parameters, 0 gradients, 8.1 GFLOPs
-                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100%|██████████| 2/2 [00:12<00:00,  6.30s/it]
-                   all         50        275      0.651      0.727      0.696      0.427
-                circle         49         49      0.965          1      0.995      0.837
-                 hours         49         49      0.627      0.714      0.743      0.431
-               minutes         49         49      0.814      0.895      0.929      0.591
-               seconds         35         35       0.43      0.518      0.423      0.221
-                center         50         50      0.551      0.515      0.422      0.149
-                    12         43         43      0.522      0.721      0.664      0.332
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100%|██████████| 4/4 [00:02<00:00,  1.64it/s]
+                   all        100        557      0.726      0.711      0.713      0.416
+                circle         99         99       0.99          1      0.995      0.775
+                 hours         99         99      0.845      0.771      0.853      0.468
+               minutes         99         99      0.816      0.889      0.912      0.595
+               seconds         67         67       0.47      0.595      0.467        0.2
+                center        100        100      0.652       0.59      0.597      0.221
+                    12         93         93      0.586      0.419      0.454      0.234
+Speed: 0.5ms preprocess, 7.2ms inference, 0.0ms loss, 3.5ms postprocess per image
+
+
+EarlyStopping: Training stopped early as no improvement observed in last 100 epochs. Best results observed at epoch 92, best model saved as best.pt.
+To update EarlyStopping(patience=100) pass a new patience value, i.e. `patience=300` or use `patience=0` to disable EarlyStopping.
+
+192 epochs completed in 0.549 hours.
+Optimizer stripped from runs\detect\train19\weights\last.pt, 5.5MB
+Optimizer stripped from runs\detect\train19\weights\best.pt, 5.5MB
+
+Validating runs\detect\train19\weights\best.pt...
+Ultralytics 8.3.39 🚀 Python-3.8.9 torch-2.2.2+cu118 CUDA:0 (NVIDIA GeForce RTX 2060, 6144MiB)
+YOLO11n summary (fused): 238 layers, 2,583,322 parameters, 0 gradients, 6.3 GFLOPs
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100%|██████████| 4/4 [00:01<00:00,  2.03it/s]
+                   all        100        557      0.718      0.752      0.736      0.435
+                circle         99         99       0.99          1      0.995      0.792
+                 hours         99         99      0.797      0.838      0.878      0.509
+               minutes         99         99      0.761      0.929      0.899      0.583
+               seconds         67         67       0.54      0.507      0.467      0.216
+                center        100        100      0.633       0.62      0.598      0.221
+                    12         93         93       0.59      0.619      0.581      0.286

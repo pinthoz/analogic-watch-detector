@@ -90,7 +90,7 @@ image_path = "examples/l.jpg"
 output_path = "examples/watch_nuno_final.jpg"
 
 # Fazer o predict
-results = model.predict(source=image_path, save=True, save_txt=False, conf = 0.5)
+results = model.predict(source=image_path, save=True, save_txt=False, conf = 0.4, max_det=6 )
 
 # Salvar as detecções em um arquivo
 detections = save_detections(results)
