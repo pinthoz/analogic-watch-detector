@@ -51,8 +51,6 @@ def rotate_yolo_annotations(input_txt, output_txt, angle, original_width, origin
     with open(input_txt, 'r') as f:
         lines = f.readlines()
     
-    center_original = (original_width / 2, original_height / 2)
-    center_rotated = (rotated_width / 2, rotated_height / 2)
     new_annotations = []
     
     for line in lines:
@@ -63,33 +61,21 @@ def rotate_yolo_annotations(input_txt, output_txt, angle, original_width, origin
         width = float(parts[3]) * original_width
         height = float(parts[4]) * original_height
         
-        # Calcula os 4 vértices do bounding box
-        x1, y1 = x_center - width / 2, y_center - height / 2  # Canto superior esquerdo
-        x2, y2 = x_center + width / 2, y_center - height / 2  # Canto superior direito
-        x3, y3 = x_center - width / 2, y_center + height / 2  # Canto inferior esquerdo
-        x4, y4 = x_center + width / 2, y_center + height / 2  # Canto inferior direito
-        
-        # Rotaciona os vértices em relação ao centro da imagem original
-        points = [
-            rotate_point((x1, y1), center_original, angle),
-            rotate_point((x2, y2), center_original, angle),
-            rotate_point((x3, y3), center_original, angle),
-            rotate_point((x4, y4), center_original, angle)
-        ]
-        
-        # Ajusta os pontos rotacionados para o novo sistema de coordenadas da imagem rotacionada
-        adjusted_points = [(p[0] - center_original[0] + center_rotated[0],
-                            p[1] - center_original[1] + center_rotated[1]) for p in points]
-        
-        # Calcula os novos limites do bounding box após a rotação
-        x_coords, y_coords = zip(*adjusted_points)  # Extrai todas as coordenadas x e y dos vértices
-        new_x_min, new_x_max = min(x_coords), max(x_coords)
-        new_y_min, new_y_max = min(y_coords), max(y_coords)
-        
-        new_x_center = (new_x_min + new_x_max) / 2
-        new_y_center = (new_y_min + new_y_max) / 2
-        new_width = new_x_max - new_x_min
-        new_height = new_y_max - new_y_min
+        if angle == -90:
+            new_x_center = original_height - y_center
+            new_y_center = x_center
+            new_width = height
+            new_height = width
+        elif angle == 180:
+            new_x_center = original_width - x_center
+            new_y_center = original_height - y_center
+            new_width = width
+            new_height = height
+        elif angle == -270:
+            new_x_center = y_center
+            new_y_center = original_width - x_center
+            new_width = height
+            new_height = width
         
         # Normaliza os valores para a escala [0, 1]
         norm_x_center = new_x_center / rotated_width
@@ -107,53 +93,54 @@ def rotate_yolo_annotations(input_txt, output_txt, angle, original_width, origin
 
 def rotate_images_and_annotations(input_dir, output_dir):
     """
-    Rotaciona imagens e suas anotações correspondentes.
+    Rotaciona imagens e suas anotações correspondentes em todos os ângulos especificados.
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     
-    angles = [180]
+    angles = [-90, 180, -270]
     
     for filename in os.listdir(input_dir):
         if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
             try:
                 input_img_path = os.path.join(input_dir, filename)
                 input_txt_path = os.path.splitext(input_img_path)[0] + '.txt'
-                random_angle = random.choice(angles)
                 
                 with Image.open(input_img_path) as img:
-                    rotated_img = img.rotate(random_angle, expand=True)
                     original_width, original_height = img.size
-                    rotated_width, rotated_height = rotated_img.size
-                    name, ext = os.path.splitext(filename)
-                    rotated_filename = f"{name}_rotated_{random_angle}{ext}"
-                    output_img_path = os.path.join(output_dir, rotated_filename)
-                    rotated_img.save(output_img_path)
-                    print(f"Imagem salva: {output_img_path}")
-                
-                if os.path.exists(input_txt_path):
-                    rotated_txt_filename = f"{name}_rotated_{random_angle}.txt"
-                    output_txt_path = os.path.join(output_dir, rotated_txt_filename)
-                    rotate_yolo_annotations(
-                        input_txt_path, 
-                        output_txt_path, 
-                        random_angle, 
-                        original_width, 
-                        original_height, 
-                        rotated_width, 
-                        rotated_height
-                    )
-                    print(f"Anotação salva: {output_txt_path}")
                     
-                    # Desenha bounding boxes antes e depois
-                    annotated_image_path = os.path.join(output_dir, f"{name}_original_with_boxes{ext}")
-                    draw_bounding_boxes(input_img_path, input_txt_path, annotated_image_path)
-                    
-                    annotated_rotated_path = os.path.join(output_dir, f"{name}_rotated_with_boxes{ext}")
-                    draw_bounding_boxes(output_img_path, output_txt_path, annotated_rotated_path)
+                    for angle in angles:
+                        rotated_img = img.rotate(angle, expand=True)
+                        rotated_width, rotated_height = rotated_img.size
+                        name, ext = os.path.splitext(filename)
+                        rotated_filename = f"{name}_rotated_{angle}{ext}"
+                        output_img_path = os.path.join(output_dir, rotated_filename)
+                        rotated_img.save(output_img_path)
+                        print(f"Imagem salva: {output_img_path}")
+                        
+                        if os.path.exists(input_txt_path):
+                            rotated_txt_filename = f"{name}_rotated_{angle}.txt"
+                            output_txt_path = os.path.join(output_dir, rotated_txt_filename)
+                            rotate_yolo_annotations(
+                                input_txt_path, 
+                                output_txt_path, 
+                                angle, 
+                                original_width, 
+                                original_height, 
+                                rotated_width, 
+                                rotated_height
+                            )
+                            print(f"Anotação salva: {output_txt_path}")
+                # Desenha bounding boxes antes e depois
+                #annotated_image_path = os.path.join(output_dir, f"{name}_original_with_boxes{ext}")
+                #draw_bounding_boxes(input_img_path, input_txt_path, annotated_image_path)
                 
+                #annotated_rotated_path = os.path.join(output_dir, f"{name}_rotated_with_boxes{ext}")
+                #draw_bounding_boxes(output_img_path, output_txt_path, annotated_rotated_path)
+                                
             except Exception as e:
                 print(f"Erro ao processar {filename}: {e}")
+
 
 # Configurações
 input_directory = r"C:\Users\anoca\Downloads\Nova pasta"
