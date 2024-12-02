@@ -75,12 +75,11 @@ def process_clock_time(detections_data, image_path):
     hours = (hour_angle / 30)  # Each hour is 30 degrees
     minutes = (minute_angle / 6)  # Each minute is 6 degrees
 
-    # Round to nearest hour/minute
-    hours = round(hours) % 12
+    # Round to nearest hour and minute
+    hours = math.floor(hours) % 12
     if hours == 0:
         hours = 12
-    minutes = round(minutes) % 60
-
+    minutes = math.floor(minutes) % 60
     # Calculate seconds if angle exists
     if seconds_angle is not None:
         seconds = (seconds_angle / 6)  # Each second is 6 degrees
@@ -134,7 +133,7 @@ def draw_clock(image_path, center_point, hours_point, minutes_point, seconds_poi
                 (10, 120 if seconds else 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
     
 
-    output_path = f'results/{image_name}'
+    output_path = f'results/images/{image_name}'
     cv2.imwrite(output_path, img)
     print(f"Annotated image saved to {output_path}")
     

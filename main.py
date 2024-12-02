@@ -10,7 +10,7 @@ class ClockDetectionApp:
     def __init__(self, master):
         self.master = master
         master.title("Clock Time Detection")
-        master.geometry("1100x750") 
+        master.geometry("1100x800") 
         master.resizable(False, False)
 
         # Apply a theme for a modern look
@@ -64,11 +64,10 @@ class ClockDetectionApp:
         results_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.results_text.config(yscrollcommand=results_scrollbar.set)
 
-        # Right side: Image display
         image_frame = ttk.LabelFrame(results_frame, text="Images", padding=10)
         image_frame.pack(side=tk.RIGHT, expand=True, fill=tk.BOTH, padx=10, pady=10)
 
-        self.original_image_label = ttk.Label(image_frame, text="Original Image", relief=tk.SUNKEN)
+        self.original_image_label = ttk.Label(image_frame, text="Final Image", relief=tk.SUNKEN)
         self.original_image_label.pack(pady=5)
         self.detection_image_label = ttk.Label(image_frame, text="Detection Image", relief=tk.SUNKEN)
         self.detection_image_label.pack(pady=5)
@@ -86,6 +85,7 @@ class ClockDetectionApp:
         self.predictions = []
         self.image_paths = []
         self.current_index = 0
+        self.ground_truth_path = "ground_truths/ground_truths.csv"
 
     def update_confidence_label(self, event=None):
         self.confidence_label.config(text=f"{self.confidence_var.get():.1f}")
@@ -101,6 +101,8 @@ class ClockDetectionApp:
             self.process_image(image_path)
             self.update_navigation_buttons()
             self.save_predictions()
+            
+            self.predictions = []
 
     def process_folder(self):
         folder_path = filedialog.askdirectory(title="Select Folder with Clock Images")
@@ -129,6 +131,8 @@ class ClockDetectionApp:
             self.current_index = 0
             self.update_image_display()
             self.update_navigation_buttons()
+            
+            self.predictions = []
 
     def update_image_display(self):
         if not self.image_paths:
@@ -148,14 +152,36 @@ class ClockDetectionApp:
             result = process_clock_time(detections, image_path)
             
             # Display results
+            image_name = os.path.splitext(os.path.basename(image_path))[0]
             result_text = f"Image: {os.path.basename(image_path)}\n"
             if result:
                 if result['seconds'] is not None:
-                    result_text += f"Time: {result['hours']:02d}:{result['minutes']:02d}:{result['seconds']:02d}\n"
+                    time_str = f"{result['hours']:02d}:{result['minutes']:02d}:{result['seconds']:02d}"
+                    self.predictions.append((image_name, time_str))
                 else:
-                    result_text += f"Time: {result['hours']:02d}:{result['minutes']:02d}\n"
+                    time_str = f"{result['hours']:02d}:{result['minutes']:02d}:00"
+                    self.predictions.append((image_name, time_str))
+                
+                # Find and calculate ground truth deviation
+                ground_truth = self.find_ground_truth(image_name)
+                deviation = self.calculate_time_deviation(time_str, ground_truth)
+                
+                # Add time and deviation to result text
+                result_text += f"Predicted Time: {time_str}\n"
+                if ground_truth:
+                    result_text += f"Ground Truth: {ground_truth}\n"
+                    if deviation is not None:
+                        result_text += f"Time Deviation: {deviation} seconds\n"
+                    else:
+                        result_text += "Time Deviation: Unable to calculate\n"
+                else:
+                    result_text += "Ground Truth: Not found\n"
             else:
+                # If detection fails
+                time_str = "failed"
+                self.predictions.append((image_name, time_str))
                 result_text += "Time detection failed\n"
+            
             result_text += "-" * 40 + "\n"
             
             if append_results:
@@ -208,10 +234,10 @@ class ClockDetectionApp:
                 )
                 
                 # Display the newly drawn clock image
-                clock_final_path = f'results/{os.path.splitext(os.path.basename(image_path))[0]}_clock.jpg'
+                clock_final_path = f'results/images/{os.path.splitext(os.path.basename(image_path))[0]}_clock.jpg'
                 if os.path.exists(clock_final_path):
                     final_pil_img = Image.open(clock_final_path)
-                    final_pil_img = final_pil_img.resize((200, 200), Image.LANCZOS)
+                    final_pil_img = final_pil_img.resize((215, 215), Image.LANCZOS)
                     final_photo = ImageTk.PhotoImage(final_pil_img)
                     self.original_image_label.config(image=final_photo, text="")
                     self.original_image_label.image = final_photo
@@ -220,7 +246,7 @@ class ClockDetectionApp:
                 detection_path = f'examples/{os.path.splitext(os.path.basename(image_path))[0]}_detection.jpg'
                 if os.path.exists(detection_path):
                     detection_pil_img = Image.open(detection_path)
-                    detection_pil_img = detection_pil_img.resize((200, 200), Image.LANCZOS)
+                    detection_pil_img = detection_pil_img.resize((215, 215), Image.LANCZOS)
                     detection_photo = ImageTk.PhotoImage(detection_pil_img)
                     self.detection_image_label.config(image=detection_photo, text="")
                     self.detection_image_label.image = detection_photo
@@ -254,7 +280,7 @@ class ClockDetectionApp:
             output_filename += '.csv'
 
         # Define the output folder and file
-        output_folder = "ground_truths"
+        output_folder = "results/files"
         os.makedirs(output_folder, exist_ok=True)
         output_file = os.path.join(output_folder, output_filename)
 
@@ -269,8 +295,17 @@ class ClockDetectionApp:
                         existing_predictions[row[0]] = row[1]
 
         # Update existing predictions or add new ones
-        for image_name, predicted_time in self.predictions:
+        for image_path, predicted_time in self.predictions:
+            # Extract just the filename without extension
+            image_name = os.path.splitext(os.path.basename(image_path))[0]
             existing_predictions[image_name] = predicted_time
+
+        # Add "Time detection failed" cases to the CSV
+        for image_path in self.image_paths:
+            # Extract just the filename without extension
+            image_name = os.path.splitext(os.path.basename(image_path))[0]
+            if image_name not in existing_predictions:
+                existing_predictions[image_name] = "failed"
 
         # Write the updated predictions back to the CSV file
         try:
@@ -282,6 +317,48 @@ class ClockDetectionApp:
             messagebox.showinfo("Success", f"Predictions saved to {output_file}")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save predictions: {e}")
+            
+    def calculate_time_deviation(self, predicted_time, ground_truth_time):
+        """
+        Calculate the absolute time difference in seconds between predicted and ground truth times.
+        """
+        if predicted_time == "failed" or ground_truth_time is None:
+            return None
+        
+        try:
+            # Split times into hours, minutes, seconds
+            pred_parts = predicted_time.split(':')
+            truth_parts = ground_truth_time.split(':')
+            
+            # Convert to total seconds
+            pred_seconds = int(pred_parts[0]) * 3600 + int(pred_parts[1]) * 60 + (int(pred_parts[2]) if len(pred_parts) > 2 else 0)
+            truth_seconds = int(truth_parts[0]) * 3600 + int(truth_parts[1]) * 60 + (int(truth_parts[2]) if len(truth_parts) > 2 else 0)
+            
+            # Calculate absolute deviation
+            return abs(pred_seconds - truth_seconds)
+        except (ValueError, IndexError):
+            return None
+
+    # Modified method to find ground truth for an image
+    def find_ground_truth(self, image_name):
+        """
+        Search for ground truth time for a given image name in the ground truth CSV.
+        """
+        try:
+            with open(self.ground_truth_path, mode='r') as file:
+                csv_reader = csv.reader(file)
+                for row in csv_reader:
+                    if row[0] == image_name:
+                        return row[1]
+        except FileNotFoundError:
+            print(f"Ground truth file {self.ground_truth_path} not found.")
+        except Exception as e:
+            print(f"Error reading ground truth file: {e}")
+        return None
+    
+        
+    
+    
 
 def main():
     root = tk.Tk()
