@@ -1,99 +1,141 @@
 import os
-import sys
-import math
-import cv2
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from PIL import Image, ImageTk
-import json
-import time
-from utils.detections_utils import run_detection, load_detections
+import csv
+from utils.detections_utils import run_detection
 from utils.clock_utils import draw_clock, get_box_center, calculate_angle, process_clock_time
-
 
 class ClockDetectionApp:
     def __init__(self, master):
         self.master = master
         master.title("Clock Time Detection")
-        master.geometry("1000x700")  # Increased size for better visibility
+        master.geometry("1100x750") 
+        master.resizable(False, False)
 
-        # Style
+        # Apply a theme for a modern look
         self.style = ttk.Style()
-        self.style.configure("TButton", padding=10, font=('Arial', 10))
-        self.style.configure("TLabel", font=('Arial', 10))
+        self.style.theme_use('clam')
 
-        # Top frame for controls
-        control_frame = tk.Frame(master)
-        control_frame.pack(pady=10)
+        # Header
+        header_frame = ttk.LabelFrame(master, text="Settings", padding=10)
+        header_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
 
-        # Confidence slider
-        tk.Label(control_frame, text="Confidence Threshold:").pack(side=tk.LEFT, padx=(0,10))
+        # Confidence Threshold
+        ttk.Label(header_frame, text="Confidence Threshold:").grid(row=0, column=0, sticky="w", padx=(0, 10))
         self.confidence_var = tk.DoubleVar(value=0.5)
-        self.confidence_slider = tk.Scale(control_frame, from_=0.1, to=1.0, resolution=0.1, 
-                                           orient=tk.HORIZONTAL, length=300, 
-                                           variable=self.confidence_var)
-        self.confidence_slider.pack(side=tk.LEFT)
+        self.confidence_slider = ttk.Scale(header_frame, from_=0.1, to=1.0, orient=tk.HORIZONTAL, length=400,
+                                           variable=self.confidence_var, command=self.update_confidence_label)
+        self.confidence_slider.grid(row=0, column=1, sticky="w")
+        self.confidence_label = ttk.Label(header_frame, text=f"{self.confidence_var.get():.1f}")
+        self.confidence_label.grid(row=0, column=2, padx=(10, 0), sticky="w")
 
-        # Button frame
-        button_frame = tk.Frame(master)
-        button_frame.pack(pady=10)
+        # CSV Output Filename
+        ttk.Label(header_frame, text="Output CSV Name:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=(10, 0))
+        self.csv_filename_var = tk.StringVar(value="predicted_times.csv")
+        self.csv_filename_entry = ttk.Entry(header_frame, textvariable=self.csv_filename_var, width=30)
+        self.csv_filename_entry.grid(row=1, column=1, sticky="w", pady=(10, 0))
 
-        # Buttons
+        # Button section
+        button_frame = ttk.LabelFrame(master, text="Actions", padding=10)
+        button_frame.pack(fill=tk.X, padx=10, pady=10)
+
         self.single_image_button = ttk.Button(button_frame, text="Select Single Image", command=self.process_single_image)
-        self.single_image_button.pack(side=tk.LEFT, padx=10)
-
+        self.single_image_button.grid(row=0, column=0, padx=10, pady=5, sticky="e")
         self.folder_button = ttk.Button(button_frame, text="Select Folder", command=self.process_folder)
-        self.folder_button.pack(side=tk.LEFT, padx=10)
+        self.folder_button.grid(row=0, column=1, padx=10, pady=5, sticky="w")
 
-        # Results frame
-        results_frame = tk.Frame(master)
-        results_frame.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
+        # Center the buttons using columnspan and rowspan
+        button_frame.grid_columnconfigure(0, weight=1)
+        button_frame.grid_columnconfigure(1, weight=1) 
+        button_frame.grid_rowconfigure(0, weight=1)  
 
-        # Left side for results text
-        results_text_frame = tk.Frame(results_frame)
-        results_text_frame.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
-        
-        self.results_text = tk.Text(results_text_frame, height=20, width=50, wrap=tk.WORD)
+        # Results section
+        results_frame = tk.Frame(master, borderwidth=2, relief=tk.GROOVE)
+        results_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Left side: Results text
+        text_frame = ttk.LabelFrame(results_frame, text="Detection Results", padding=10)
+        text_frame.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=10, pady=10)
+
+        self.results_text = tk.Text(text_frame, height=20, width=50, wrap=tk.WORD)
         self.results_text.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
-        
-        results_scrollbar = tk.Scrollbar(results_text_frame, command=self.results_text.yview)
+        results_scrollbar = tk.Scrollbar(text_frame, command=self.results_text.yview)
         results_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.results_text.config(yscrollcommand=results_scrollbar.set)
 
-        # Right side for images
-        image_frame = tk.Frame(results_frame)
-        image_frame.pack(side=tk.RIGHT, expand=True, fill=tk.BOTH)
+        # Right side: Image display
+        image_frame = ttk.LabelFrame(results_frame, text="Images", padding=10)
+        image_frame.pack(side=tk.RIGHT, expand=True, fill=tk.BOTH, padx=10, pady=10)
 
-        # Original image label
-        self.original_image_label = tk.Label(image_frame, text="Original Image")
-        self.original_image_label.pack()
+        self.original_image_label = ttk.Label(image_frame, text="Original Image", relief=tk.SUNKEN)
+        self.original_image_label.pack(pady=5)
+        self.detection_image_label = ttk.Label(image_frame, text="Detection Image", relief=tk.SUNKEN)
+        self.detection_image_label.pack(pady=5)
 
-        # Detection image label
-        self.detection_image_label = tk.Label(image_frame, text="Detection Image")
-        self.detection_image_label.pack()
+        # Navigation buttons
+        nav_frame = tk.Frame(image_frame)
+        nav_frame.pack(pady=10)
+
+        self.prev_button = ttk.Button(nav_frame, text="Previous", command=self.show_previous_image, state=tk.DISABLED)
+        self.prev_button.pack(side=tk.LEFT, padx=5)
+        self.next_button = ttk.Button(nav_frame, text="Next", command=self.show_next_image, state=tk.DISABLED)
+        self.next_button.pack(side=tk.LEFT, padx=5)
+
+        # Storage for predictions and image paths
+        self.predictions = []
+        self.image_paths = []
+        self.current_index = 0
+
+    def update_confidence_label(self, event=None):
+        self.confidence_label.config(text=f"{self.confidence_var.get():.1f}")
 
     def process_single_image(self):
         image_path = filedialog.askopenfilename(
-            title="Select Clock Image", 
+            title="Select Clock Image",
             filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp")]
         )
         if image_path:
+            self.image_paths = [image_path]  # Single image
+            self.current_index = 0
             self.process_image(image_path)
+            self.update_navigation_buttons()
+            self.save_predictions()
 
     def process_folder(self):
         folder_path = filedialog.askdirectory(title="Select Folder with Clock Images")
         if folder_path:
-            image_files = [
-                os.path.join(folder_path, f) for f in os.listdir(folder_path) 
+            # Gather all image files in the folder
+            self.image_paths = [
+                os.path.join(folder_path, f) for f in os.listdir(folder_path)
                 if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))
             ]
-            
+
+            if not self.image_paths:
+                messagebox.showinfo("No Images", "No valid images found in the selected folder.")
+                return
+
+            self.predictions = []  # Clear predictions for a new batch
             self.results_text.delete(1.0, tk.END)
-            self.original_image_label.config(image='', text="Original Image")
-            self.detection_image_label.config(image='', text="Detection Image")
-            
-            for image_path in image_files:
+
+            # Process each image and store predictions
+            for image_path in self.image_paths:
                 self.process_image(image_path, append_results=True)
+
+            # Save all predictions after processing
+            self.save_predictions()
+
+            # Set up scrolling functionality
+            self.current_index = 0
+            self.update_image_display()
+            self.update_navigation_buttons()
+
+    def update_image_display(self):
+        if not self.image_paths:
+            return
+
+        image_path = self.image_paths[self.current_index]
+        self.process_image(image_path, append_results=False)
 
     def process_image(self, image_path, append_results=False):
         confidence = self.confidence_var.get()
@@ -169,33 +211,77 @@ class ClockDetectionApp:
                 clock_final_path = f'results/{os.path.splitext(os.path.basename(image_path))[0]}_clock.jpg'
                 if os.path.exists(clock_final_path):
                     final_pil_img = Image.open(clock_final_path)
-                    final_pil_img.thumbnail((400, 400))
+                    final_pil_img = final_pil_img.resize((200, 200), Image.LANCZOS)
                     final_photo = ImageTk.PhotoImage(final_pil_img)
                     self.original_image_label.config(image=final_photo, text="")
                     self.original_image_label.image = final_photo
-            
-            # Display detection image (keep existing code)
-            detection_path = f'examples/{os.path.splitext(os.path.basename(image_path))[0]}_detection.jpg'
-            print(f"Attempting to load detection image from: {detection_path}")
-            
-            time.sleep(1)  # Wait for file to be written
-            
-            if os.path.exists(detection_path):
-                print("Detection image found!")
-                detection_pil_img = Image.open(detection_path)
-                detection_pil_img.thumbnail((400, 400))
-                detection_photo = ImageTk.PhotoImage(detection_pil_img)
-                self.detection_image_label.config(image=detection_photo, text="")
-                self.detection_image_label.image = detection_photo
-            else:
-                print(f"Detection image not found at {detection_path}")
-                self.detection_image_label.config(image='', text="No Detection Image")
-            
+
+                # Display detection image
+                detection_path = f'examples/{os.path.splitext(os.path.basename(image_path))[0]}_detection.jpg'
+                if os.path.exists(detection_path):
+                    detection_pil_img = Image.open(detection_path)
+                    detection_pil_img = detection_pil_img.resize((200, 200), Image.LANCZOS)
+                    detection_photo = ImageTk.PhotoImage(detection_pil_img)
+                    self.detection_image_label.config(image=detection_photo, text="")
+                    self.detection_image_label.image = detection_photo
+                else:
+                    self.detection_image_label.config(image='', text="No Detection Image")
         except Exception as e:
             print(f"Error processing image: {e}")
             messagebox.showerror("Error", f"An error occurred: {e}")
 
+    def show_previous_image(self):
+        if self.current_index > 0:
+            self.current_index -= 1
+            self.update_image_display()
+            self.update_navigation_buttons()
 
+    def show_next_image(self):
+        if self.current_index < len(self.image_paths) - 1:
+            self.current_index += 1
+            self.update_image_display()
+            self.update_navigation_buttons()
+
+
+    def update_navigation_buttons(self):
+        self.prev_button.config(state=tk.NORMAL if self.current_index > 0 else tk.DISABLED)
+        self.next_button.config(state=tk.NORMAL if self.current_index < len(self.image_paths) - 1 else tk.DISABLED)
+
+    def save_predictions(self):
+        # Get the custom CSV filename
+        output_filename = self.csv_filename_var.get()
+        if not output_filename.endswith('.csv'):
+            output_filename += '.csv'
+
+        # Define the output folder and file
+        output_folder = "ground_truths"
+        os.makedirs(output_folder, exist_ok=True)
+        output_file = os.path.join(output_folder, output_filename)
+
+        # Load existing predictions from the CSV file
+        existing_predictions = {}
+        if os.path.exists(output_file):
+            with open(output_file, mode='r', newline='') as csvfile:
+                csv_reader = csv.reader(csvfile)
+                next(csv_reader, None)  # Skip header
+                for row in csv_reader:
+                    if len(row) == 2:  # Ensure row has the correct format
+                        existing_predictions[row[0]] = row[1]
+
+        # Update existing predictions or add new ones
+        for image_name, predicted_time in self.predictions:
+            existing_predictions[image_name] = predicted_time
+
+        # Write the updated predictions back to the CSV file
+        try:
+            with open(output_file, mode='w', newline='') as csvfile:
+                csv_writer = csv.writer(csvfile)
+                csv_writer.writerow(["Image Name", "Predicted Time"])
+                for image_name, predicted_time in existing_predictions.items():
+                    csv_writer.writerow([image_name, predicted_time])
+            messagebox.showinfo("Success", f"Predictions saved to {output_file}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save predictions: {e}")
 
 def main():
     root = tk.Tk()
