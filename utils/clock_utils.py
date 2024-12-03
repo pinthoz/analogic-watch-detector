@@ -80,6 +80,7 @@ def process_clock_time(detections_data, image_path):
     if hours == 0:
         hours = 12
     minutes = math.floor(minutes) % 60
+    
     # Calculate seconds if angle exists
     if seconds_angle is not None:
         seconds = (seconds_angle / 6)  # Each second is 6 degrees

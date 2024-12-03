@@ -1,13 +1,13 @@
 import os
 
 # Folder containing the images
-folder_path = r"C:\Users\anoca\Documents\GitHub\analogic-watch-detector\dataset\images\train\novos\rodados"
+folder_path = r"C:\Users\anoca\Documents\GitHub\analogic-watch-detector\clock_second_hand\samples"
 
 # Starting number for the renaming
-start_number = 451
+start_number = 563
 
 # Get all .jpg files in the folder
-files = [f for f in os.listdir(folder_path) if f.lower().endswith('.jpg')]
+files = [f for f in os.listdir(folder_path) if f.lower().endswith('.png')]
 
 # Sort files to ensure consistent renaming
 files.sort()
