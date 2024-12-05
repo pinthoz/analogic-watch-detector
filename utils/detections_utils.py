@@ -53,7 +53,7 @@ def run_detection(image_path, model_path=None, confidence=0.5, save_path=None):
     
     # Load model and run detection
     model = YOLO(model_path)
-    results = model.predict(source=image_path, save=True, save_txt=False, conf=confidence, max_det=6)
+    results = model.predict(source=image_path, save=True, save_txt=False, conf=confidence, max_det=5)
     
     # Convert detections to list format and apply filtering
     detections = []

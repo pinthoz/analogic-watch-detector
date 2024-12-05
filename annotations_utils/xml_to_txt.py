@@ -7,8 +7,7 @@ class_mapping = {
     "hours": 1,
     "minutes": 2,
     "seconds": 3,
-    "center": 4,
-    "12": 5
+    "12": 4
 }
 
 # Diretório contendo os arquivos XML

@@ -1,5 +1,5 @@
 train: C:\Users\anoca\Documents\GitHub\analogic-watch-detector\dataset\images\train
 val: C:\Users\anoca\Documents\GitHub\analogic-watch-detector\dataset\images\val
 
-nc: 6
-names: ['circle', 'hours', 'minutes', 'seconds', 'center', '12']
+nc: 5
+names: ['circle', 'hours', 'minutes', 'seconds', '12']
