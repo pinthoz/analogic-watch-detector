@@ -4,7 +4,7 @@ from tkinter import filedialog, messagebox, ttk
 from PIL import Image, ImageTk
 import csv
 from utils.detections_utils import run_detection
-from utils.clock_utils import draw_clock, get_box_center, calculate_angle, process_clock_time
+from utils.clock_utils import draw_clock, get_box_center, calculate_angle, process_clock_with_fallback, draw_clock_advanced
 
 class ClockDetectionApp:
     def __init__(self, master):
@@ -145,18 +145,21 @@ class ClockDetectionApp:
         confidence = self.confidence_var.get()
         
         try:
-            # Run detection
+            # Use the new fallback detection method
             detections = run_detection(image_path, confidence=confidence)
-            
-            # Process clock time
-            result = process_clock_time(detections, image_path)
+
+            result = process_clock_with_fallback(image_path, confidence)
             
             # Display results
             image_name = os.path.splitext(os.path.basename(image_path))[0]
             result_text = f"Image: {os.path.basename(image_path)}\n"
+            
             if result:
                 if result['seconds'] is not None:
                     time_str = f"{result['hours']:02d}:{result['minutes']:02d}:{result['seconds']:02d}"
+                    self.predictions.append((image_name, time_str))
+                if result['hours'] is not None and result['minutes'] is None:
+                    time_str = f"{result['hours']:02d}:00:00"
                     self.predictions.append((image_name, time_str))
                 else:
                     time_str = f"{result['hours']:02d}:{result['minutes']:02d}:00"
@@ -177,7 +180,7 @@ class ClockDetectionApp:
                 else:
                     result_text += "Ground Truth: Not found\n"
             else:
-                # If detection fails
+                # If detection fails completely
                 time_str = "failed"
                 self.predictions.append((image_name, time_str))
                 result_text += "Time detection failed\n"
@@ -272,6 +275,7 @@ class ClockDetectionApp:
     def update_navigation_buttons(self):
         self.prev_button.config(state=tk.NORMAL if self.current_index > 0 else tk.DISABLED)
         self.next_button.config(state=tk.NORMAL if self.current_index < len(self.image_paths) - 1 else tk.DISABLED)
+        
 
     def save_predictions(self):
         # Get the custom CSV filename

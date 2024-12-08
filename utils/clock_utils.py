@@ -1,5 +1,9 @@
 import cv2
 import math
+import numpy as np
+import matplotlib.pyplot as plt
+from utils.detections_utils import run_detection
+import os
 
 
 def get_box_center(box):
@@ -138,3 +142,142 @@ def draw_clock(image_path, center_point, hours_point, minutes_point, seconds_poi
     cv2.imwrite(output_path, img)
     print(f"Annotated image saved to {output_path}")
     
+def zoom_into_clock_circle(image_path, confidence=0.5):
+    """
+    Attempt to find the clock circle and zoom into it for more precise detection.
+    
+    Args:
+        image_path (str): Path to the input image
+        confidence (float): Confidence threshold for detection
+    
+    Returns:
+        str: Path to the zoomed-in image, or None if no suitable circle found
+    """
+    # Read the image
+    image = cv2.imread(image_path)
+    
+    # Run detection to find clock circle
+    detections = run_detection(image_path, confidence=confidence)
+    
+    # Find the circle detection with highest confidence
+    circle_detection = None
+    for detection in detections[0]:
+        if detection['class_name'] == 'circle' and detection['confidence'] >= confidence:
+            if not circle_detection or detection['confidence'] > circle_detection['confidence']:
+                circle_detection = detection
+    
+    if not circle_detection:
+        return None
+    
+    # Extract bounding box
+    x1, y1, x2, y2 = circle_detection['box']
+    
+    # Add some padding (20% on each side)
+    height, width = image.shape[:2]
+    pad_x = int((x2 - x1) * 0.2)
+    pad_y = int((y2 - y1) * 0.2)
+    
+    # Calculate padded coordinates with boundary checks
+    x1_pad = max(0, x1 - pad_x)
+    y1_pad = max(0, y1 - pad_y)
+    x2_pad = min(width, x2 + pad_x)
+    y2_pad = min(height, y2 + pad_y)
+    
+    # Crop the image
+    zoomed_image = image[int(y1_pad):int(y2_pad), int(x1_pad):int(x2_pad)]
+    
+    # Save the zoomed image
+    zoomed_image_path = f'zoomed_images/{os.path.splitext(os.path.basename(image_path))[0]}_zoomed.jpg'
+    os.makedirs('zoomed_images', exist_ok=True)
+    cv2.imwrite(zoomed_image_path, zoomed_image)
+    
+    return zoomed_image_path
+
+def process_clock_with_fallback(image_path, confidence=0.5):
+    """
+    Attempt to process clock time with fallback to zoomed detection.
+    
+    Args:
+        image_path (str): Path to the input image
+        confidence (float): Confidence threshold for detection
+    
+    Returns:
+        dict or None: Processed clock time result
+    """
+    # First attempt with original image
+    original_result = process_clock_time(run_detection(image_path, confidence=confidence), image_path)
+    
+    # If original detection succeeds, return the result
+    if original_result:
+        return original_result
+    
+    # Try zooming into clock circle
+    zoomed_image_path = zoom_into_clock_circle(image_path, confidence)
+    
+    # If no zoom possible, return None
+    if not zoomed_image_path:
+        return None
+    
+    # Attempt detection on zoomed image
+    zoomed_result = process_clock_time(run_detection(zoomed_image_path, confidence=confidence), zoomed_image_path)
+    
+    return zoomed_result
+
+
+#######################################################
+# Advanced Clock Processing with Multiple Strategies #
+
+    
+
+def draw_clock_advanced(image_path, detection_result, center_point, hours_point, minutes_point, seconds_point, number_12_point, image_name):
+    """
+    Enhanced clock drawing with statistical overlays
+    """
+    img = cv2.imread(image_path)
+    
+    # To int
+    center = (int(center_point[0]), int(center_point[1]))
+    hours = (int(hours_point[0]), int(hours_point[1]))
+    minutes = (int(minutes_point[0]), int(minutes_point[1]))
+    seconds = (int(seconds_point[0]), int(seconds_point[1])) if seconds_point else None
+    twelve = (int(number_12_point[0]), int(number_12_point[1]))
+    
+    # Draw the reference points
+    cv2.circle(img, center, 3, (0, 0, 255), -1)  # Centro em vermelho
+    cv2.circle(img, twelve, 3, (255, 0, 0), -1)  # Ponto 12 em azul
+    
+    # Draw the lines with thicker strokes
+    cv2.line(img, center, hours, (0, 0, 255), 5)     # Ponteiro das horas em vermelho (espessura maior)
+    cv2.line(img, center, minutes, (255, 0, 0), 4)   # Ponteiro dos minutos em azul (espessura maior)
+    if seconds:
+        cv2.line(img, center, seconds, (255, 165, 0), 2)   # Ponteiro dos segundos em laranja (espessura maior)
+    
+    cv2.line(img, center, twelve, (0, 255, 0), 1)    # Linha de referência (12h) em verde
+    # Add statistical overlays
+    stats_font = cv2.FONT_HERSHEY_SIMPLEX
+    stats_color = (255, 255, 255)  # White
+    
+    # Confidence information
+    if 'confidence' in detection_result:
+        hour_conf = detection_result['confidence']['hours']
+        minute_conf = detection_result['confidence']['minutes']
+        
+        cv2.putText(img, f"Hour Conf: {hour_conf:.2f}", 
+                    (10, img.shape[0] - 100), 
+                    stats_font, 0.7, stats_color, 2)
+        
+        cv2.putText(img, f"Minute Conf: {minute_conf:.2f}", 
+                    (10, img.shape[0] - 70), 
+                    stats_font, 0.7, stats_color, 2)
+    
+    # Add timestamp and other metadata
+    cv2.putText(img, f"Timestamp: {detection_result['hours']:02d}:{detection_result['minutes']:02d}", 
+                (10, img.shape[0] - 40), 
+                stats_font, 0.7, stats_color, 2)
+    
+    output_path = f'results/images/advanced_{image_name}'
+    cv2.imwrite(output_path, img)
+    
+    return output_path
+
+

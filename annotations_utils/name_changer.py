@@ -1,10 +1,10 @@
 import os
 
 # Folder containing the images
-folder_path = r"C:\Users\anoca\Documents\GitHub\analogic-watch-detector\test_set"
+folder_path = r"C:\Users\anoca\Documents\GitHub\analogic-watch-detector\test_set\novos"
 
 # Starting number for the renaming
-start_number = 1
+start_number = 27
 
 # Get all .jpg files in the folder
 files = [f for f in os.listdir(folder_path) if f.lower().endswith('.jpg')]

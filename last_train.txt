@@ -79,3 +79,26 @@ YOLO11n summary (fused): 238 layers, 2,583,127 parameters, 0 gradients, 6.3 GFLO
                minutes        137        137      0.987      0.993      0.992      0.861
                seconds        108        108      0.963      0.954      0.984      0.802
                     12        133        133      0.914       0.94      0.953      0.676
+
+
+Validating c:\users\anoca\documents\github\analogic-watch-detector\runs\detect\train47\weights\best.pt...
+Ultralytics 8.3.40 🚀 Python-3.8.9 torch-2.2.2+cu118 CUDA:0 (NVIDIA GeForce RTX 2060, 6144MiB)
+Model summary (fused): 168 layers, 3,006,623 parameters, 0 gradients, 8.1 GFLOPs
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100%|██████████| 5/5 [00:02<00:00,  1.84it/s]
+                   all        138        655      0.932      0.927      0.954      0.755
+                circle        138        138      0.989          1      0.995      0.976
+                 hours        138        139      0.956      0.957      0.973      0.744
+               minutes        137        137      0.951      0.971      0.984      0.796
+               seconds        108        108      0.881      0.821      0.904       0.65
+                    12        133        133      0.881      0.887      0.912      0.607
+Speed: 0.3ms preprocess, 2.6ms inference, 0.0ms loss, 3.1ms postprocess per image
+
+YOLO11n summary (fused): 238 layers, 2,583,127 parameters, 0 gradients, 6.3 GFLOPs
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100%|██████████| 5/5 [00:03<00:00,  1.57it/s]
+                   all        138        655      0.963      0.971      0.984      0.822
+                circle        138        138      0.991          1      0.995      0.988
+                 hours        138        139      0.957      0.978      0.983      0.801
+               minutes        137        137      0.971          1      0.991       0.86
+               seconds        108        108      0.942      0.954      0.979      0.772
+                    12        133        133      0.951      0.925      0.974       0.69
+Speed: 0.3ms preprocess, 4.6ms inference, 0.0ms loss, 2.8ms postprocess per image

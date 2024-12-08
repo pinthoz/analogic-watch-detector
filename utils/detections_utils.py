@@ -5,6 +5,8 @@ from ultralytics import YOLO
 import cv2
 import numpy as np
 import torch
+import hashlib
+import functools
 
 def get_latest_train_dir(base_path="runs/detect"):
     """Find the most recent training directory (train, train1, train2, etc.)"""
