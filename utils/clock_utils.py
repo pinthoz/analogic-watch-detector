@@ -187,7 +187,7 @@ def zoom_into_clock_circle(image_path, confidence=0.5):
     zoomed_image = image[int(y1_pad):int(y2_pad), int(x1_pad):int(x2_pad)]
     
     # Save the zoomed image
-    zoomed_image_path = f'zoomed_images/{os.path.splitext(os.path.basename(image_path))[0]}_zoomed.jpg'
+    zoomed_image_path = f'results/zoomed_images/{os.path.splitext(os.path.basename(image_path))[0]}_zoomed.jpg'
     os.makedirs('zoomed_images', exist_ok=True)
     cv2.imwrite(zoomed_image_path, zoomed_image)
     
@@ -205,11 +205,11 @@ def process_clock_with_fallback(image_path, confidence=0.5):
         dict or None: Processed clock time result
     """
     # First attempt with original image
-    original_result = process_clock_time(run_detection(image_path, confidence=confidence), image_path)
+    #original_result = process_clock_time(run_detection(image_path, confidence=confidence), image_path)
     
     # If original detection succeeds, return the result
-    if original_result:
-        return original_result
+    #if original_result:
+    #    return original_result
     
     # Try zooming into clock circle
     zoomed_image_path = zoom_into_clock_circle(image_path, confidence)
@@ -218,10 +218,11 @@ def process_clock_with_fallback(image_path, confidence=0.5):
     if not zoomed_image_path:
         return None
     
+    detections = run_detection(zoomed_image_path, confidence=confidence, zoom = True)
     # Attempt detection on zoomed image
-    zoomed_result = process_clock_time(run_detection(zoomed_image_path, confidence=confidence), zoomed_image_path)
+    zoomed_result = process_clock_time(detections, zoomed_image_path)
     
-    return zoomed_result
+    return detections, zoomed_result
 
 
 #######################################################

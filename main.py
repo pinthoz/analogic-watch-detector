@@ -3,8 +3,9 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from PIL import Image, ImageTk
 import csv
+import re
 from utils.detections_utils import run_detection
-from utils.clock_utils import draw_clock, get_box_center, calculate_angle, process_clock_with_fallback, draw_clock_advanced
+from utils.clock_utils import draw_clock, get_box_center, calculate_angle, process_clock_with_fallback, process_clock_time
 
 class ClockDetectionApp:
     def __init__(self, master):
@@ -22,13 +23,7 @@ class ClockDetectionApp:
         header_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
 
         # Confidence Threshold
-        ttk.Label(header_frame, text="Confidence Threshold:").grid(row=0, column=0, sticky="w", padx=(0, 10))
-        self.confidence_var = tk.DoubleVar(value=0.5)
-        self.confidence_slider = ttk.Scale(header_frame, from_=0.1, to=1.0, orient=tk.HORIZONTAL, length=400,
-                                           variable=self.confidence_var, command=self.update_confidence_label)
-        self.confidence_slider.grid(row=0, column=1, sticky="w")
-        self.confidence_label = ttk.Label(header_frame, text=f"{self.confidence_var.get():.1f}")
-        self.confidence_label.grid(row=0, column=2, padx=(10, 0), sticky="w")
+        self.confidence_var = tk.DoubleVar(value=0.1)
 
         # CSV Output Filename
         ttk.Label(header_frame, text="Output CSV Name:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=(10, 0))
@@ -86,6 +81,8 @@ class ClockDetectionApp:
         self.image_paths = []
         self.current_index = 0
         self.ground_truth_path = "ground_truths/ground_truths.csv"
+        self.loaded_predictions = {}
+
 
     def update_confidence_label(self, event=None):
         self.confidence_label.config(text=f"{self.confidence_var.get():.1f}")
@@ -126,6 +123,7 @@ class ClockDetectionApp:
 
             # Save all predictions after processing
             self.save_predictions()
+            self.load_predictions() 
 
             # Set up scrolling functionality
             self.current_index = 0
@@ -139,21 +137,48 @@ class ClockDetectionApp:
             return
 
         image_path = self.image_paths[self.current_index]
-        self.process_image(image_path, append_results=False)
+        image_name = os.path.splitext(os.path.basename(image_path))[0]
+
+        if image_name in self.loaded_predictions:
+            predicted_time = self.loaded_predictions[image_name]
+            result_text = f"Image: {os.path.basename(image_path)}\n"
+            if predicted_time != "failed":
+                result_text += f"Predicted Time: {predicted_time}\n"
+            else:
+                result_text += "Time detection failed\n"
+            result_text += "-" * 40 + "\n"
+
+            self.results_text.delete(1.0, tk.END)
+            self.results_text.insert(tk.END, result_text)
+            self.results_text.see(tk.END)
+            
+            # Display images without processing new detections
+            self.display_image(image_path)
+        else:
+            self.results_text.delete(1.0, tk.END)
+            self.results_text.insert(tk.END, "Prediction not found in CSV.\n")
+
 
     def process_image(self, image_path, append_results=False):
         confidence = self.confidence_var.get()
-        
+
         try:
+            zoom = False
             # Use the new fallback detection method
             detections = run_detection(image_path, confidence=confidence)
 
-            result = process_clock_with_fallback(image_path, confidence)
+            result = process_clock_time(detections, image_path)
             
+            if result is None:
+                detections, result = process_clock_with_fallback(image_path, confidence)
+                print("Fallback detection method succeeded.") if result else print("Fallback detection method failed.")
+                zoom = True
+                
             # Display results
+            
             image_name = os.path.splitext(os.path.basename(image_path))[0]
             result_text = f"Image: {os.path.basename(image_path)}\n"
-            
+
             if result:
                 if result['seconds'] is not None:
                     time_str = f"{result['hours']:02d}:{result['minutes']:02d}:{result['seconds']:02d}"
@@ -186,78 +211,119 @@ class ClockDetectionApp:
                 result_text += "Time detection failed\n"
             
             result_text += "-" * 40 + "\n"
-            
+
             if append_results:
                 self.results_text.insert(tk.END, result_text)
             else:
                 self.results_text.delete(1.0, tk.END)
                 self.results_text.insert(tk.END, result_text)
-            
-            self.results_text.see(tk.END)
-            
-            # Organize detections by class_name
-            detections_by_class = {}
-            for detection in detections[0]:
-                class_name = detection['class_name']
-                if class_name not in detections_by_class or detection['confidence'] > detections_by_class[class_name]['confidence']:
-                    detections_by_class[class_name] = detection
-            
-            # Draw clock visualization
-            if all(key in detections_by_class for key in ['hours', 'minutes', '12', 'circle']):
-                # Calculate points
-                circle_box_point = get_box_center(detections_by_class['circle']['box'])
-                center_point = get_box_center(detections_by_class['center']['box']) if 'center' in detections_by_class else circle_box_point
-                hours_point = get_box_center(detections_by_class['hours']['box'])
-                minutes_point = get_box_center(detections_by_class['minutes']['box'])
-                number_12_point = get_box_center(detections_by_class['12']['box'])
-                
-                # Prepare for drawing
-                seconds_point = get_box_center(detections_by_class['seconds']['box']) if 'seconds' in detections_by_class else None
-                
-                # Calculate angles
-                hour_angle = calculate_angle(center_point, hours_point, number_12_point)
-                minute_angle = calculate_angle(center_point, minutes_point, number_12_point)
-                seconds_angle = calculate_angle(center_point, seconds_point, number_12_point) if seconds_point else None
-                
-                # Draw the clock visualization
-                draw_clock(
-                    image_path, 
-                    center_point, 
-                    hours_point, 
-                    minutes_point, 
-                    seconds_point, 
-                    number_12_point, 
-                    hour_angle, 
-                    minute_angle, 
-                    seconds_angle, 
-                    result['hours'], 
-                    result['minutes'], 
-                    result.get('seconds', 0),
-                    f"{os.path.splitext(os.path.basename(image_path))[0]}_clock.jpg"
-                )
-                
-                # Display the newly drawn clock image
-                clock_final_path = f'results/images/{os.path.splitext(os.path.basename(image_path))[0]}_clock.jpg'
-                if os.path.exists(clock_final_path):
-                    final_pil_img = Image.open(clock_final_path)
-                    final_pil_img = final_pil_img.resize((215, 215), Image.LANCZOS)
-                    final_photo = ImageTk.PhotoImage(final_pil_img)
-                    self.original_image_label.config(image=final_photo, text="")
-                    self.original_image_label.image = final_photo
 
-                # Display detection image
-                detection_path = f'examples/{os.path.splitext(os.path.basename(image_path))[0]}_detection.jpg'
-                if os.path.exists(detection_path):
+            self.results_text.see(tk.END)
+
+            # Display the original image in the final image section
+            try:
+                original_pil_img = Image.open(image_path)
+                original_pil_img = original_pil_img.resize((215, 215), Image.LANCZOS)
+                original_photo = ImageTk.PhotoImage(original_pil_img)
+                self.original_image_label.config(image=original_photo, text="")
+                self.original_image_label.image = original_photo
+            except Exception as e:
+                print(f"Error displaying original image: {e}")
+                self.original_image_label.config(image='', text="Failed to load original image")
+
+            # Display the detection image, if it exists
+            if zoom:
+                # Regex para capturar 'watch_test' seguido de números
+                match = re.search(r'(watch_test\d+)', image_path)
+                if match:
+                    extracted_id = match.group(1)
+                detection_path = f'results/image_detections/{extracted_id}_zoomed_detection.jpg'
+            else:
+                detection_path = f'results/image_detections/{os.path.splitext(os.path.basename(image_path))[0]}_detection.jpg'
+                
+            if os.path.exists(detection_path):
+                try:
                     detection_pil_img = Image.open(detection_path)
                     detection_pil_img = detection_pil_img.resize((215, 215), Image.LANCZOS)
                     detection_photo = ImageTk.PhotoImage(detection_pil_img)
                     self.detection_image_label.config(image=detection_photo, text="")
                     self.detection_image_label.image = detection_photo
+                except Exception as e:
+                    print(f"Error displaying detection image: {e}")
+                    self.detection_image_label.config(image='', text="Failed to load detection image")
+            else:
+                self.detection_image_label.config(image='', text="No Detection Image")
+
+            # Draw clock visualization if detections exist
+            try:
+                detections_by_class = {}
+                for detection in detections[0]:
+                    class_name = detection['class_name']
+                    if class_name not in detections_by_class or detection['confidence'] > detections_by_class[class_name]['confidence']:
+                        detections_by_class[class_name] = detection
+
+                if all(key in detections_by_class for key in ['hours', '12', 'circle']):
+                    # Calculate points
+                    circle_box_point = get_box_center(detections_by_class['circle']['box'])
+                    center_point = get_box_center(detections_by_class['center']['box']) if 'center' in detections_by_class else circle_box_point
+                    hours_point = get_box_center(detections_by_class['hours']['box'])
+                    number_12_point = get_box_center(detections_by_class['12']['box'])
+
+                    # Prepare for drawing
+                    seconds_point = get_box_center(detections_by_class['seconds']['box']) if 'seconds' in detections_by_class else None
+                    minutes_point = get_box_center(detections_by_class['minutes']['box']) if 'minutes' in detections_by_class else None
+
+                    # Calculate angles
+                    hour_angle = calculate_angle(center_point, hours_point, number_12_point)
+                    minute_angle = calculate_angle(center_point, minutes_point, number_12_point) if minutes_point else None
+                    seconds_angle = calculate_angle(center_point, seconds_point, number_12_point) if seconds_point else None
+                    # Draw the clock visualization
+                    if zoom:
+                        p = f"{os.path.splitext(os.path.basename(image_path))[0]}_clock_zoomed.jpg"
+                    else:
+                        p = f"{os.path.splitext(os.path.basename(image_path))[0]}_clock.jpg"
+                    if zoom:
+                        image_path = f'results/zoomed_images/{os.path.splitext(os.path.basename(image_path))[0]}_zoomed.jpg'
+                    draw_clock(
+                        image_path, 
+                        center_point, 
+                        hours_point, 
+                        minutes_point, 
+                        seconds_point, 
+                        number_12_point, 
+                        hour_angle, 
+                        minute_angle, 
+                        seconds_angle, 
+                        result['hours'], 
+                        result.get('minutes', 0),
+                        result.get('seconds', 0),
+                        p
+                    )
+                    
+
+                    # Display the newly drawn clock image
+                    if zoom:
+                        # Regex para capturar 'watch_test' seguido de números
+                        match = re.search(r'(watch_test\d+)', image_path)
+                        if match:
+                            extracted_id = match.group(1)
+                        clock_final_path = f'results/images/{extracted_id}_clock_zoomed.jpg'
+                    else:
+                        clock_final_path = f'results/images/{os.path.splitext(os.path.basename(image_path))[0]}_clock.jpg'
+                    if os.path.exists(clock_final_path):
+                        final_pil_img = Image.open(clock_final_path)
+                        final_pil_img = final_pil_img.resize((215, 215), Image.LANCZOS)
+                        final_photo = ImageTk.PhotoImage(final_pil_img)
+                        self.original_image_label.config(image=final_photo, text="")
+                        self.original_image_label.image = final_photo
                 else:
-                    self.detection_image_label.config(image='', text="No Detection Image")
+                    print("Missing detections required to draw clock.")
+            except Exception as e:
+                print(f"Error drawing clock: {e}")
         except Exception as e:
             print(f"Error processing image: {e}")
             messagebox.showerror("Error", f"An error occurred: {e}")
+
 
     def show_previous_image(self):
         if self.current_index > 0:
@@ -360,6 +426,87 @@ class ClockDetectionApp:
             print(f"Error reading ground truth file: {e}")
         return None
     
+    def load_predictions(self):
+        """
+        Load predictions from the CSV file into memory.
+        """
+        output_filename = self.csv_filename_var.get()
+        if not output_filename.endswith('.csv'):
+            output_filename += '.csv'
+
+        output_folder = "results/files"
+        output_file = os.path.join(output_folder, output_filename)
+
+        self.loaded_predictions.clear()
+        if os.path.exists(output_file):
+            try:
+                with open(output_file, mode='r', newline='') as csvfile:
+                    csv_reader = csv.reader(csvfile)
+                    next(csv_reader, None)  # Skip header
+                    for row in csv_reader:
+                        if len(row) == 2:
+                            self.loaded_predictions[row[0]] = row[1]
+            except Exception as e:
+                print(f"Error loading predictions: {e}")
+                
+    def display_image(self, image_path):
+        try:
+            # Check if this is a zoomed image
+            zoom = False
+            match = re.search(r'(watch_test\d+)', image_path)
+            if match:
+                extracted_id = match.group(1)
+                zoom = True
+
+            # Determine final image path based on zoom
+            if zoom:
+                match = re.search(r'(watch_test\d+)', image_path)
+                if match:
+                    extracted_id = match.group(1)
+                    clock_final_path = f'results/images/{extracted_id}_clock_zoomed.jpg'
+                else:
+                    clock_final_path = None
+            else:
+                clock_final_path = f'results/images/{os.path.splitext(os.path.basename(image_path))[0]}_clock.jpg'
+
+            # Prioritize the newly drawn clock image if it exists
+            if clock_final_path and os.path.exists(clock_final_path):
+                final_pil_img = Image.open(clock_final_path)
+            else:
+                # Fallback to original image if no clock image
+                if zoom:
+                    image_path = f'results/zoomed_images/{os.path.splitext(os.path.basename(image_path))[0]}_zoomed.jpg'
+                final_pil_img = Image.open(image_path)
+
+            # Resize and display the image
+            final_pil_img = final_pil_img.resize((215, 215), Image.LANCZOS)
+            final_photo = ImageTk.PhotoImage(final_pil_img)
+            self.original_image_label.config(image=final_photo, text="")
+            self.original_image_label.image = final_photo
+            
+            # Determine detection image path based on zoom
+            if zoom:
+                detection_path = f'results/image_detections/{extracted_id}_zoomed_detection.jpg'
+            else:
+                detection_path = f'results/image_detections/{os.path.splitext(os.path.basename(image_path))[0]}_detection.jpg'
+            
+            # Display detection image
+            if os.path.exists(detection_path):
+                detection_pil_img = Image.open(detection_path)
+                detection_pil_img = detection_pil_img.resize((215, 215), Image.LANCZOS)
+                detection_photo = ImageTk.PhotoImage(detection_pil_img)
+                self.detection_image_label.config(image=detection_photo, text="")
+                self.detection_image_label.image = detection_photo
+            else:
+                self.detection_image_label.config(image='', text="No Detection Image")
+        
+        except Exception as e:
+            print(f"Error displaying image: {e}")
+            self.original_image_label.config(image='', text="Failed to load original image")
+            self.detection_image_label.config(image='', text="Failed to load detection image")
+
+
+    
         
     
     
@@ -371,3 +518,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

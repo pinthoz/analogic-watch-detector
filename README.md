@@ -1,4 +1,4 @@
-# TickTock Analog / HandsOnTime / AnalogTimeDetector
+# AnalogTimeDetector
 
 ## Introduction
 
@@ -69,7 +69,13 @@ The app provides a user-friendly GUI where you can:
 - View the final image with the hands highlighted.
 - View the detected components of the clock (circle, hour hand, minute hand, second hand, and 12 marker).
 
-### 4. Handling Ground Truths
+We have a function called `soft_nms` that is used to remove overlapping bounding boxes. This function is used to improve the detection of the hands of the clock. This function allows 3 methods to be used: `linear`, `gaussian`, and `hard`. The default method is `linear`. You can change the method by changing the value of the `soft_nms_method` variable in the `main.py` file.
+
+### 4. Test Set
+
+We have provided a test set in the `test_set` folder. You can use this set to evaluate the model's performance. The images in this folder are not part of the training or validation datasets and they are retired from X, Reddit and the last ones are photos taken by us.
+
+### 5. Handling Ground Truths
 If you have a file containing the actual times for the images:
 
 1. Place the file in the ground_truths folder.
@@ -101,3 +107,6 @@ pip install -r requirements.txt
 2. CSV Report:
 Predicted times are saved in results/files/<output_csv_name>.csv.
 
+## Examples
+
+Meter imagens
