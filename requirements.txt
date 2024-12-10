@@ -11,3 +11,4 @@ torchvision==0.17.2+cu118
 ultralytics==8.3.40
 matplotlib==3.7.5
 tqdm==4.67.1
+ttkthemes==3.2.2

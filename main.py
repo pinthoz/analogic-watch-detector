@@ -6,30 +6,46 @@ import csv
 import re
 from utils.detections_utils import run_detection
 from utils.clock_utils import draw_clock, get_box_center, calculate_angle, process_clock_with_fallback, process_clock_time
+from ttkthemes import ThemedTk
 
 class ClockDetectionApp:
     def __init__(self, master):
         self.master = master
-        master.title("Clock Time Detection")
+        master.title("AnalogTimeDetector")
         master.geometry("1100x800") 
         master.resizable(False, False)
+        
+        icon = Image.open('img/icon.png').resize((128, 128), Image.LANCZOS)
+        photo_icon = ImageTk.PhotoImage(icon)
+        master.iconphoto(True, photo_icon)
 
         # Apply a theme for a modern look
         self.style = ttk.Style()
-        self.style.theme_use('clam')
+        self.style.theme_use('alt')
 
         # Header
         header_frame = ttk.LabelFrame(master, text="Settings", padding=10)
         header_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
 
         # Confidence Threshold
-        self.confidence_var = tk.DoubleVar(value=0.1)
+        self.confidence_var = tk.DoubleVar(value=0.01)
 
         # CSV Output Filename
         ttk.Label(header_frame, text="Output CSV Name:").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=(10, 0))
         self.csv_filename_var = tk.StringVar(value="predicted_times.csv")
         self.csv_filename_entry = ttk.Entry(header_frame, textvariable=self.csv_filename_var, width=30)
         self.csv_filename_entry.grid(row=1, column=1, sticky="w", pady=(10, 0))
+        
+        # Ground Truth CSV Selection Button
+        self.ground_truth_path_var = tk.StringVar(value="ground_truths.csv")
+        ttk.Label(header_frame, text="Ground Truth CSV:").grid(row=1, column=2, sticky="w", padx=(10, 0), pady=(10, 0))
+        self.ground_truth_path_entry = ttk.Entry(header_frame, textvariable=self.ground_truth_path_var, width=30)
+        self.ground_truth_path_entry.grid(row=1, column=3, sticky="w", pady=(10, 0))
+        
+        # Button to select ground truth CSV
+        self.ground_truth_select_button = ttk.Button(header_frame, text="Browse", command=self.select_ground_truth_csv)
+        self.ground_truth_select_button.grid(row=1, column=4, sticky="w", padx=(5, 0), pady=(10, 0))
+
 
         # Button section
         button_frame = ttk.LabelFrame(master, text="Actions", padding=10)
@@ -80,12 +96,9 @@ class ClockDetectionApp:
         self.predictions = []
         self.image_paths = []
         self.current_index = 0
-        self.ground_truth_path = "ground_truths/ground_truths.csv"
+        self.ground_truth_path = "ground_truths/ground_truths_test.csv"
         self.loaded_predictions = {}
 
-
-    def update_confidence_label(self, event=None):
-        self.confidence_label.config(text=f"{self.confidence_var.get():.1f}")
 
     def process_single_image(self):
         image_path = filedialog.askopenfilename(
@@ -104,11 +117,17 @@ class ClockDetectionApp:
     def process_folder(self):
         folder_path = filedialog.askdirectory(title="Select Folder with Clock Images")
         if folder_path:
-            # Gather all image files in the folder
-            self.image_paths = [
+            # Natural sorting of image files to handle numeric order correctly
+            def natural_sort_key(filename):
+                # Extract numeric parts from the filename
+                return [int(text) if text.isdigit() else text.lower() 
+                        for text in re.split(r'(\d+)', filename)]
+
+            # Gather all image files in the folder and sort them using natural sorting
+            self.image_paths = sorted([
                 os.path.join(folder_path, f) for f in os.listdir(folder_path)
                 if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))
-            ]
+            ], key=lambda x: natural_sort_key(os.path.basename(x)))
 
             if not self.image_paths:
                 messagebox.showinfo("No Images", "No valid images found in the selected folder.")
@@ -129,7 +148,7 @@ class ClockDetectionApp:
             self.current_index = 0
             self.update_image_display()
             self.update_navigation_buttons()
-            
+
             self.predictions = []
 
     def update_image_display(self):
@@ -139,24 +158,40 @@ class ClockDetectionApp:
         image_path = self.image_paths[self.current_index]
         image_name = os.path.splitext(os.path.basename(image_path))[0]
 
+        result_text = f"Image: {os.path.basename(image_path)}\n"
+
         if image_name in self.loaded_predictions:
             predicted_time = self.loaded_predictions[image_name]
-            result_text = f"Image: {os.path.basename(image_path)}\n"
+            
+            # Find ground truth
+            ground_truth = self.find_ground_truth(image_name)
+            
             if predicted_time != "failed":
                 result_text += f"Predicted Time: {predicted_time}\n"
+                
+                # Calculate and display deviation
+                if ground_truth:
+                    deviation = self.calculate_time_deviation(predicted_time, ground_truth)
+                    result_text += f"Ground Truth: {ground_truth}\n"
+                    if deviation is not None:
+                        result_text += f"Time Deviation: {deviation} seconds\n"
+                    else:
+                        result_text += "Time Deviation: Unable to calculate\n"
+                else:
+                    result_text += "Ground Truth: Not found\n"
             else:
                 result_text += "Time detection failed\n"
-            result_text += "-" * 40 + "\n"
-
-            self.results_text.delete(1.0, tk.END)
-            self.results_text.insert(tk.END, result_text)
-            self.results_text.see(tk.END)
-            
-            # Display images without processing new detections
-            self.display_image(image_path)
         else:
-            self.results_text.delete(1.0, tk.END)
-            self.results_text.insert(tk.END, "Prediction not found in CSV.\n")
+            result_text += "Prediction not found in CSV.\n"
+
+        result_text += "-" * 40 + "\n"
+
+        self.results_text.delete(1.0, tk.END)
+        self.results_text.insert(tk.END, result_text)
+        self.results_text.see(tk.END)
+        
+        # Display images without processing new detections
+        self.display_image(image_path)
 
 
     def process_image(self, image_path, append_results=False):
@@ -451,53 +486,39 @@ class ClockDetectionApp:
                 
     def display_image(self, image_path):
         try:
-            # Check if this is a zoomed image
-            zoom = False
-            match = re.search(r'(watch_test\d+)', image_path)
-            if match:
-                extracted_id = match.group(1)
-                zoom = True
+            # Define clock image path
+            extracted_id = os.path.splitext(os.path.basename(image_path))[0]
+            clock_final_path = f'results/images/{extracted_id}_clock.jpg'
 
-            # Determine final image path based on zoom
-            if zoom:
-                match = re.search(r'(watch_test\d+)', image_path)
-                if match:
-                    extracted_id = match.group(1)
-                    clock_final_path = f'results/images/{extracted_id}_clock_zoomed.jpg'
-                else:
-                    clock_final_path = None
-            else:
-                clock_final_path = f'results/images/{os.path.splitext(os.path.basename(image_path))[0]}_clock.jpg'
-
-            # Prioritize the newly drawn clock image if it exists
-            if clock_final_path and os.path.exists(clock_final_path):
+            if os.path.exists(clock_final_path):
                 final_pil_img = Image.open(clock_final_path)
             else:
-                # Fallback to original image if no clock image
-                if zoom:
-                    image_path = f'results/zoomed_images/{os.path.splitext(os.path.basename(image_path))[0]}_zoomed.jpg'
+                print(f"Clock image not found: {clock_final_path}")
                 final_pil_img = Image.open(image_path)
 
-            # Resize and display the image
-            final_pil_img = final_pil_img.resize((215, 215), Image.LANCZOS)
-            final_photo = ImageTk.PhotoImage(final_pil_img)
-            self.original_image_label.config(image=final_photo, text="")
-            self.original_image_label.image = final_photo
-            
-            # Determine detection image path based on zoom
-            if zoom:
-                detection_path = f'results/image_detections/{extracted_id}_zoomed_detection.jpg'
+            if final_pil_img:
+                final_pil_img = final_pil_img.resize((215, 215), Image.LANCZOS)
+                final_photo = ImageTk.PhotoImage(final_pil_img)
+                self.original_image_label.config(image=final_photo, text="")
+                self.original_image_label.image = final_photo
             else:
-                detection_path = f'results/image_detections/{os.path.splitext(os.path.basename(image_path))[0]}_detection.jpg'
+                self.original_image_label.config(image='', text="Clock Image Not Found")
             
-            # Display detection image
+            # Determine detection image path
+            detection_path = os.path.join(
+                'results', 'image_detections', f"{extracted_id}_detection.jpg"
+            )
+
+            # Display detection image if exists
             if os.path.exists(detection_path):
+                print(f"Detection image found: {detection_path}")
                 detection_pil_img = Image.open(detection_path)
                 detection_pil_img = detection_pil_img.resize((215, 215), Image.LANCZOS)
                 detection_photo = ImageTk.PhotoImage(detection_pil_img)
                 self.detection_image_label.config(image=detection_photo, text="")
                 self.detection_image_label.image = detection_photo
             else:
+                print(f"No detection image found at: {detection_path}")
                 self.detection_image_label.config(image='', text="No Detection Image")
         
         except Exception as e:
@@ -505,17 +526,26 @@ class ClockDetectionApp:
             self.original_image_label.config(image='', text="Failed to load original image")
             self.detection_image_label.config(image='', text="Failed to load detection image")
 
-
-    
-        
+    def select_ground_truth_csv(self):
+        ground_truth_path = filedialog.askopenfilename(
+        title="Select Ground Truth CSV",
+        filetypes=[("CSV files", "*.csv")],
+        initialdir="ground_truths"  # Optional: set an initial directory
+        )
+        if ground_truth_path:
+            # Update the ground truth path variable
+            self.ground_truth_path_var.set(ground_truth_path)
+            # Also update the ground_truth_path attribute
+            self.ground_truth_path = ground_truth_path
     
     
 
 def main():
-    root = tk.Tk()
+    root = ThemedTk(theme="Breeze")  
     app = ClockDetectionApp(root)
     root.mainloop()
-
 if __name__ == "__main__":
     main()
 
+# compor o ser necessario minutes
+# 

@@ -11,10 +11,10 @@ def read_annotations(file_path):
     return annotations
 
 # Caminhos das pastas
-images_folder = r"C:\Users\anoca\Documents\GitHub\analogic-watch-detector\dataset\images\train"
-labels_folder = r"C:\Users\anoca\Documents\GitHub\analogic-watch-detector\dataset\labels\train"
-output_images_folder = r"C:\Users\anoca\Documents\GitHub\analogic-watch-detector\dataset\images\train"
-output_labels_folder = r"C:\Users\anoca\Documents\GitHub\analogic-watch-detector\dataset\labels\train"
+images_folder = r"C:\Users\anoca\Documents\GitHub\analogic-watch-detector\rr"
+labels_folder = r"C:\Users\anoca\Documents\GitHub\analogic-watch-detector"
+output_images_folder = r"C:\Users\anoca\Documents\GitHub\analogic-watch-detector\rr"
+output_labels_folder = r"C:\Users\anoca\Documents\GitHub\analogic-watch-detector"
 
 # Certificar-se de que as pastas de saída existem
 os.makedirs(output_images_folder, exist_ok=True)

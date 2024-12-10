@@ -26,7 +26,7 @@ def get_latest_train_dir(base_path="runs/detect"):
     latest_train = max(train_dirs, key=get_train_number)
     return os.path.join(base_path, latest_train)
 
-def run_detection(image_path, model_path=None, confidence=0.1, save_path=None, nms_method=1, nms_sigma=0.5, zoom=False):
+def run_detection(image_path, model_path=r"C:\Users\anoca\Documents\GitHub\analogic-watch-detector\runs\detect\train57\weights\last.pt", confidence=0.01, save_path=None, nms_method=1, nms_sigma=0.5, zoom=False):
     """
     Run object detection on an image with Soft Non-Maximum Suppression
     
@@ -70,7 +70,7 @@ def run_detection(image_path, model_path=None, confidence=0.1, save_path=None, n
             boxes, 
             confidences, 
             classes,
-            confidence_threshold=0.1,  # Low threshold to start
+            confidence_threshold=0.01,  # Low threshold to start
             iou_threshold=0.5, 
             sigma=nms_sigma, 
             method=nms_method
@@ -125,7 +125,7 @@ def load_detections(input_file):
         detections = json.load(f)
     return detections
 
-def soft_nms(boxes, scores, classes, confidence_threshold=0.1, iou_threshold=0.5, sigma=0.5, method=1):
+def soft_nms(boxes, scores, classes, confidence_threshold=0.01, iou_threshold=0.5, sigma=0.5, method=1):
     """
     Soft Non-Maximum Suppression with multiple detection support
     

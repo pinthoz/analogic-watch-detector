@@ -56,20 +56,25 @@ def process_clock_time(detections_data, image_path):
         center_point = circle_box_point
 
     hours_point = get_box_center(detections_by_class['hours']['box'])
-    minutes_point = get_box_center(detections_by_class['minutes']['box'])
     number_12_point = get_box_center(detections_by_class['12']['box'])
 
     # Try to get seconds point with highest confidence
     seconds_point = None
     seconds_angle = None
     calculated_seconds = 0
+    
+    if 'minutes' in detections_by_class:
+        minutes_point = get_box_center(detections_by_class['minutes']['box'])
 
     if 'seconds' in detections_by_class:
         seconds_point = get_box_center(detections_by_class['seconds']['box'])
 
     # Calculate raw angles relative to 12 o'clock position
     hour_angle = calculate_angle(center_point, hours_point, number_12_point)
-    minute_angle = calculate_angle(center_point, minutes_point, number_12_point)
+    
+    # Calculate minute angle
+    if minutes_point:
+        minute_angle = calculate_angle(center_point, minutes_point, number_12_point)
 
     # Calculate seconds angle if seconds point exists
     if seconds_point:
@@ -77,13 +82,16 @@ def process_clock_time(detections_data, image_path):
 
     # Convert angles to time
     hours = (hour_angle / 30)  # Each hour is 30 degrees
-    minutes = (minute_angle / 6)  # Each minute is 6 degrees
 
     # Round to nearest hour and minute
     hours = math.floor(hours) % 12
     if hours == 0:
         hours = 12
-    minutes = math.floor(minutes) % 60
+    
+    if minute_angle is not None:
+        minutes = (minute_angle / 6)
+        minutes = round(minutes) % 60
+        calculated_minutes = minutes
     
     # Calculate seconds if angle exists
     if seconds_angle is not None:
@@ -93,7 +101,7 @@ def process_clock_time(detections_data, image_path):
 
     return {
         'hours': hours,
-        'minutes': minutes,
+        'minutes': calculated_minutes if minute_angle is not None else None,
         'seconds': calculated_seconds if seconds_angle is not None else None
     }
 
@@ -105,7 +113,7 @@ def draw_clock(image_path, center_point, hours_point, minutes_point, seconds_poi
     # To int
     center = (int(center_point[0]), int(center_point[1]))
     hours = (int(hours_point[0]), int(hours_point[1]))
-    minutes = (int(minutes_point[0]), int(minutes_point[1]))
+    minutes = (int(minutes_point[0]), int(minutes_point[1])) if minutes_point else None
     seconds = (int(seconds_point[0]), int(seconds_point[1])) if seconds_point else None
     twelve = (int(number_12_point[0]), int(number_12_point[1]))
     
@@ -114,18 +122,23 @@ def draw_clock(image_path, center_point, hours_point, minutes_point, seconds_poi
     cv2.circle(img, twelve, 3, (255, 0, 0), -1)  # Ponto 12 em azul
     
     # Draw the lines with thicker strokes
-    cv2.line(img, center, hours, (0, 0, 255), 5)     # Ponteiro das horas em vermelho (espessura maior)
-    cv2.line(img, center, minutes, (255, 0, 0), 4)   # Ponteiro dos minutos em azul (espessura maior)
+    cv2.line(img, center, hours, (0, 0, 255), 5)     # Ponteiro das horas em vermelho 
+    if minutes:
+        cv2.line(img, center, minutes, (255, 0, 0), 4) # Ponteiro dos minutos em azul 
     if seconds:
-        cv2.line(img, center, seconds, (255, 165, 0), 2)   # Ponteiro dos segundos em laranja (espessura maior)
+        cv2.line(img, center, seconds, (255, 165, 0), 2)   # Ponteiro dos segundos em laranja 
     
     cv2.line(img, center, twelve, (0, 255, 0), 1)    # Linha de referência (12h) em verde
     
     # Draw the text
     cv2.putText(img, f"Hour angle: {hour_angle:.1f}", 
                 (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
-    cv2.putText(img, f"Minute angle: {minute_angle:.1f}", 
-                (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
+    if minute_angle is not None:
+        cv2.putText(img, f"Minute angle: {minute_angle:.1f}", 
+                    (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
+        time_text = f"Time: {int(calculated_hours):02d}:{int(calculated_minutes):02d}"
+    else:
+        time_text = f"Time: {int(calculated_hours):02d}"
     
     if seconds_angle is not None:
         cv2.putText(img, f"Seconds angle: {seconds_angle:.1f}", 
@@ -188,7 +201,7 @@ def zoom_into_clock_circle(image_path, confidence=0.5):
     
     # Save the zoomed image
     zoomed_image_path = f'results/zoomed_images/{os.path.splitext(os.path.basename(image_path))[0]}_zoomed.jpg'
-    os.makedirs('zoomed_images', exist_ok=True)
+    os.makedirs('results/zoomed_images', exist_ok=True)
     cv2.imwrite(zoomed_image_path, zoomed_image)
     
     return zoomed_image_path
@@ -225,60 +238,5 @@ def process_clock_with_fallback(image_path, confidence=0.5):
     return detections, zoomed_result
 
 
-#######################################################
-# Advanced Clock Processing with Multiple Strategies #
 
     
-
-def draw_clock_advanced(image_path, detection_result, center_point, hours_point, minutes_point, seconds_point, number_12_point, image_name):
-    """
-    Enhanced clock drawing with statistical overlays
-    """
-    img = cv2.imread(image_path)
-    
-    # To int
-    center = (int(center_point[0]), int(center_point[1]))
-    hours = (int(hours_point[0]), int(hours_point[1]))
-    minutes = (int(minutes_point[0]), int(minutes_point[1]))
-    seconds = (int(seconds_point[0]), int(seconds_point[1])) if seconds_point else None
-    twelve = (int(number_12_point[0]), int(number_12_point[1]))
-    
-    # Draw the reference points
-    cv2.circle(img, center, 3, (0, 0, 255), -1)  # Centro em vermelho
-    cv2.circle(img, twelve, 3, (255, 0, 0), -1)  # Ponto 12 em azul
-    
-    # Draw the lines with thicker strokes
-    cv2.line(img, center, hours, (0, 0, 255), 5)     # Ponteiro das horas em vermelho (espessura maior)
-    cv2.line(img, center, minutes, (255, 0, 0), 4)   # Ponteiro dos minutos em azul (espessura maior)
-    if seconds:
-        cv2.line(img, center, seconds, (255, 165, 0), 2)   # Ponteiro dos segundos em laranja (espessura maior)
-    
-    cv2.line(img, center, twelve, (0, 255, 0), 1)    # Linha de referência (12h) em verde
-    # Add statistical overlays
-    stats_font = cv2.FONT_HERSHEY_SIMPLEX
-    stats_color = (255, 255, 255)  # White
-    
-    # Confidence information
-    if 'confidence' in detection_result:
-        hour_conf = detection_result['confidence']['hours']
-        minute_conf = detection_result['confidence']['minutes']
-        
-        cv2.putText(img, f"Hour Conf: {hour_conf:.2f}", 
-                    (10, img.shape[0] - 100), 
-                    stats_font, 0.7, stats_color, 2)
-        
-        cv2.putText(img, f"Minute Conf: {minute_conf:.2f}", 
-                    (10, img.shape[0] - 70), 
-                    stats_font, 0.7, stats_color, 2)
-    
-    # Add timestamp and other metadata
-    cv2.putText(img, f"Timestamp: {detection_result['hours']:02d}:{detection_result['minutes']:02d}", 
-                (10, img.shape[0] - 40), 
-                stats_font, 0.7, stats_color, 2)
-    
-    output_path = f'results/images/advanced_{image_name}'
-    cv2.imwrite(output_path, img)
-    
-    return output_path
-
-
