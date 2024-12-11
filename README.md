@@ -49,8 +49,10 @@ To train the model with the updated dataset:
 1. Ensure the dataset configuration is defined in `dataset.yaml`.
 2. Run the training script:
 ```bash
-yolo task=detect mode=train data=dataset.yaml model=yolo11n.pt epochs=200 imgsz=640 device=0 lr0=1e-2 momentum=0.95 weight_decay=1e-3 label_smoothing=0.1 fliplr=0.5 hsv_h=0.05 hsv_v=0.4 scale=0.5 perspective=0.25
+python utils/train_model.py
 ```
+We used Ultralytics 8.3.40 🚀 Python-3.8.9 torch-2.2.2+cu118 CUDA:0 (NVIDIA GeForce RTX 2060, 6144MiB) for the train.
+If you don't have GPU, you can change the `device` variable in the `train_model.py` file to 1.
 You can adjust parameters as needed.
 
 
@@ -69,7 +71,7 @@ The app provides a user-friendly GUI where you can:
 - View the final image with the hands highlighted.
 - View the detected components of the clock (circle, hour hand, minute hand, second hand, and 12 marker).
 
-We have a function called `soft_nms` that is used to remove overlapping bounding boxes. This function is used to improve the detection of the hands of the clock. This function allows 3 methods to be used: `linear`, `gaussian`, and `hard`. The default method is `linear`. You can change the method by changing the value of the `soft_nms_method` variable in the `main.py` file.
+This app will always select the last model trained. If you want to use a specific model, you can change the `model_path` variable in the `utils\detections_utils` file in the `run_detection` function.
 
 ### 4. Test Set
 

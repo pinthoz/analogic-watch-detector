@@ -1,0 +1,30 @@
+# 10/10 iterations complete ✅ (20545.62s)
+# Results saved to c:\users\anoca\documents\github\analogic-watch-detector\runs\detect\tune4
+# Best fitness=0.73101 observed at iteration 2
+# Best fitness metrics are {'metrics/precision(B)': 0.87234, 'metrics/recall(B)': 0.90131, 'metrics/mAP50(B)': 0.91442, 'metrics/mAP50-95(B)': 0.71064, 'val/box_loss': 0.97716, 'val/cls_loss': 0.55457, 'val/dfl_loss': 1.14012, 'fitness': 0.73101}
+# Best fitness model is c:\users\anoca\documents\github\analogic-watch-detector\runs\detect\train63
+# Best fitness hyperparameters are printed below.
+
+lr0: 0.00972
+lrf: 0.00979
+momentum: 0.93883
+weight_decay: 0.0005
+warmup_epochs: 2.88938
+warmup_momentum: 0.8
+box: 7.86031
+cls: 0.5
+dfl: 1.51617
+hsv_h: 0.01468
+hsv_s: 0.66991
+hsv_v: 0.41405
+degrees: 0.0
+translate: 0.09758
+scale: 0.48822
+shear: 0.0
+perspective: 0.0
+flipud: 0.0
+fliplr: 0.49082
+bgr: 0.0
+mosaic: 1.0
+mixup: 0.0
+copy_paste: 0.0

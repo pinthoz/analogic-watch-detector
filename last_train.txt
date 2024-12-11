@@ -182,4 +182,14 @@ Speed: 0.5ms preprocess, 7.1ms inference, 0.0ms loss, 49.8ms postprocess per ima
 Results saved to c:\users\anoca\documents\github\analogic-watch-detector\runs\detect\train57
 
 
-yolo task=detect mode=train model=yolov8m.pt data=dataset.yaml epochs=250 batch=16 imgsz=640 device=0 save=true patience=25 optimizer=adamw verbose=true deterministic=true cos_lr=false rect=false val=true conf=0 iou=0.7 workers=8 overlap_mask=true mask_ratio=4 dropout=0.0 seed=0 agnostic_nms=false lr0=0.0001 momentum=0.85 weight_decay=1.0e-05 label_smoothing=0.1 hsv_h=0.02 hsv_s=0.6 hsv_v=0.5 translate=0.1 scale=0.3 fliplr=0.5
+Validating c:\users\anoca\documents\github\analogic-watch-detector\runs\detect\train75\weights\best.pt...
+Ultralytics 8.3.40 🚀 Python-3.8.9 torch-2.2.2+cu118 CUDA:0 (NVIDIA GeForce RTX 2060, 6144MiB)
+Model summary (fused): 168 layers, 11,127,519 parameters, 0 gradients, 28.4 GFLOPs
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100%|██████████| 5/5 [00:05<00:00,  1.08s/it]
+                   all        138        655      0.969      0.983      0.984       0.87
+                circle        138        138      0.993          1      0.995      0.989
+                 hours        138        139      0.986      0.986       0.99      0.847
+               minutes        137        137      0.986      0.993      0.992      0.901
+               seconds        108        108      0.945      0.954      0.971      0.851
+                    12        133        133      0.936      0.985      0.973      0.763
+Speed: 0.5ms preprocess, 10.1ms inference, 0.0ms loss, 5.4ms postprocess per image

@@ -155,7 +155,7 @@ def draw_clock(image_path, center_point, hours_point, minutes_point, seconds_poi
     cv2.imwrite(output_path, img)
     print(f"Annotated image saved to {output_path}")
     
-def zoom_into_clock_circle(image_path, confidence=0.5):
+def zoom_into_clock_circle(image_path, confidence=0.01):
     """
     Attempt to find the clock circle and zoom into it for more precise detection.
     
@@ -206,7 +206,7 @@ def zoom_into_clock_circle(image_path, confidence=0.5):
     
     return zoomed_image_path
 
-def process_clock_with_fallback(image_path, confidence=0.5):
+def process_clock_with_fallback(image_path, confidence=0.01):
     """
     Attempt to process clock time with fallback to zoomed detection.
     

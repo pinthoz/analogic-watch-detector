@@ -2,7 +2,7 @@ import cv2
 from ultralytics import YOLO
 
 
-model = YOLO(r'C:\Users\anoca\Documents\GitHub\analogic-watch-detector\runs\detect\train44\weights\best.pt') 
+model = YOLO('runs\detect\train44\weights\best.pt') #Model
 
 
 cap = cv2.VideoCapture(0)
