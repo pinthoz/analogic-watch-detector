@@ -25,7 +25,7 @@ while True:
     annotated_frame = results[0].plot()
 
     # Displaying the frame
-    cv2.imshow("Detecção YOLO", annotated_frame)
+    cv2.imshow("Detection YOLO", annotated_frame)
 
     # Press 'esc' to exit
     if cv2.waitKey(1) & 0xFF == ord('esc'):

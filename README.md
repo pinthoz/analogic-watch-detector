@@ -122,3 +122,12 @@ Predicted times are saved in results/files/<output_csv_name>.csv.
 
 ![image](img/2.png)
 
+## Other Notes
+
+We have also provided a script to detect the time from a camera feed. You can run the script by executing the following command:
+
+```bash
+python real_time.py
+```
+
+This project was developed by Ana Pinto and Pedro Leitão as part of a Computer Vision course.
