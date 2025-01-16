@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Upload, RotateCw, AlertCircle, X, ChevronRight, Sparkles } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Clock, Upload, RotateCw, AlertCircle, X } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -11,16 +12,7 @@ const ClockDetector = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [confidence, setConfidence] = useState(null);
-  const [timeString, setTimeString] = useState('');
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      setTimeString(now.toLocaleTimeString());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const [detectionImage, setDetectionImage] = useState(null);
 
   const handleImageUpload = useCallback((event) => {
     const file = event.target.files[0];
@@ -30,10 +22,10 @@ const ClockDetector = () => {
       setDetectedTime(null);
       setError(null);
       setConfidence(null);
-      setIsExpanded(true);
+      setDetectionImage(null);
     }
   }, []);
-
+  
   const detectTime = async () => {
     setIsLoading(true);
     setError(null);
@@ -51,18 +43,23 @@ const ClockDetector = () => {
       
       if (!response.ok) {
         let errorMessage = 'An error occurred while detecting the time';
+        
         if (data.detail && typeof data.detail === 'object') {
           errorMessage = data.detail.message;
+          console.error('Error details: ', data.detail.technical_details);
         } else if (typeof data.detail === 'string') {
           errorMessage = data.detail;
         }
+        
         throw new Error(errorMessage);
       }
       
       setDetectedTime(data.time);
       setConfidence(data.confidence);
+      setDetectionImage(data.detectionImage);
     } catch (error) {
       setError(error.message);
+      console.error('Error in detection: ', error);
     } finally {
       setIsLoading(false);
     }
@@ -74,147 +71,191 @@ const ClockDetector = () => {
     setDetectedTime(null);
     setError(null);
     setConfidence(null);
-    setIsExpanded(false);
+    setDetectionImage(null);
   }, []);
 
   return (
-    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center overflow-hidden">
-      {/* Animated Background */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(76,29,149,0.2),rgba(0,0,0,0.9))]" />
-      </div>
-
-      {/* Current Time Display */}
-      <motion.div
-        initial={{ y: -50, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="text-4xl font-mono text-purple-300 mb-8"
+    <div className="fixed inset-0 bg-gradient-to-br from-purple-950 via-violet-900 to-fuchsia-900 text-white">
+      {/* Header with Glassmorphism */}
+      <motion.div 
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-purple-950/30 backdrop-blur-lg border-b border-purple-500/20 z-10"
       >
-        {timeString}
+        <motion.div 
+          className="flex items-center gap-3"
+          whileHover={{ scale: 1.02 }}
+        >
+          <Clock className="w-6 h-6 text-purple-400" />
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
+            Analogic Watch Detector
+          </h1>
+        </motion.div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-purple-300 hover:text-white hover:bg-purple-800/50"
+          onClick={resetDetection}
+        >
+          <X className="w-4 h-4" />
+        </Button>
       </motion.div>
 
       {/* Main Content */}
-      <div className="relative flex flex-col items-center">
-        {/* Upload Circle */}
-        <motion.div
-          className={`relative w-96 h-96 rounded-full ${
-            selectedImage ? 'bg-purple-900/20' : 'bg-purple-900/10'
-          } backdrop-blur-xl border border-purple-500/30 flex items-center justify-center transition-all duration-500`}
-          animate={{
-            scale: isExpanded ? [1, 1.1, 1] : 1,
-            rotate: isExpanded ? [0, 10, 0] : 0
-          }}
-          transition={{ duration: 0.5 }}
+      <div className="fixed inset-0 pt-16 flex">
+        {/* Left Panel - Preview Area */}
+        <div className="relative flex-1 flex items-center justify-center p-8">
+          <AnimatePresence mode="wait">
+            {!selectedImage ? (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="w-full max-w-lg"
+              >
+                <label 
+                  htmlFor="image-upload" 
+                  className="block p-12 border-2 border-dashed border-purple-500/50 rounded-2xl bg-purple-900/20 hover:bg-purple-800/30 transition-all duration-300 cursor-pointer text-center backdrop-blur-sm hover:shadow-2xl hover:shadow-purple-500/20"
+                >
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                  >
+                    <Upload className="w-16 h-16 mx-auto mb-4 text-purple-400" />
+                    <p className="text-xl text-purple-200 mb-3">Drop your clock image here</p>
+                    <p className="text-sm text-purple-300">or click to browse files</p>
+                  </motion.div>
+                  <input
+                    type="file"
+                    id="image-upload"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </label>
+              </motion.div>
+            ) : (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="relative w-full h-full flex items-center justify-center"
+              >
+                <motion.img 
+                  initial={{ scale: 0.8 }}
+                  animate={{ scale: 1 }}
+                  src={previewUrl} 
+                  alt="Clock preview" 
+                  className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl shadow-purple-500/20"
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Right Panel - Results Overlay with Glassmorphism */}
+        <motion.div 
+          initial={{ x: 100 }}
+          animate={{ x: 0 }}
+          className="w-96 h-full bg-purple-950/40 backdrop-blur-xl border-l border-purple-500/20 flex flex-col"
         >
-          {!selectedImage ? (
-            <motion.label
-              htmlFor="image-upload"
-              className="absolute inset-4 rounded-full cursor-pointer overflow-hidden group"
-              whileHover={{ scale: 1.05 }}
-            >
-              <div className="absolute inset-0 bg-purple-800/20 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center">
-                <Upload className="w-16 h-16 text-purple-400 mb-4" />
-                <p className="text-xl text-purple-200 mb-2">Drop your clock image</p>
-                <p className="text-sm text-purple-300">or click to browse</p>
-              </div>
-              <input
-                type="file"
-                id="image-upload"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-            </motion.label>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="absolute inset-4 rounded-full overflow-hidden"
-            >
-              <img
-                src={previewUrl}
-                alt="Clock preview"
-                className="w-full h-full object-cover"
-              />
-            </motion.div>
-          )}
-
-          {/* Detect Button */}
-          {selectedImage && (
-            <Button
-              className="absolute -right-20 top-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 w-10 h-10 p-0"
-              onClick={detectTime}
+          <div className="flex-1 p-6 overflow-y-auto">
+            <Button 
+              onClick={detectTime} 
               disabled={!selectedImage || isLoading}
+              className="w-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 mb-6 h-12 text-lg font-medium shadow-lg shadow-purple-500/20"
             >
-              {isLoading ? <RotateCw className="w-5 h-5 animate-spin" /> : <ChevronRight className="w-5 h-5" />}
+              {isLoading ? (
+                <motion.div
+                  className="flex items-center justify-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <RotateCw className="w-5 h-5 animate-spin mr-2" />
+                  Detecting...
+                </motion.div>
+              ) : (
+                <motion.div
+                  className="flex items-center justify-center"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <Clock className="w-5 h-5 mr-2" />
+                  Detect Time
+                </motion.div>
+              )}
             </Button>
-          )}
-        </motion.div>
 
-        {/* Results Panel */}
-        <AnimatePresence>
-          {detectedTime && (
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
-              className="w-full max-w-xl mt-8"
-            >
-              <div className="bg-purple-900/30 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-purple-400" />
-                    <h3 className="text-lg font-semibold text-purple-200">Detection Results</h3>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-purple-300 hover:text-white hover:bg-purple-800/50"
-                    onClick={resetDetection}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                <div className="text-center mb-6">
-                  <motion.p 
-                    className="text-5xl font-bold bg-gradient-to-r from-purple-300 to-fuchsia-300 bg-clip-text text-transparent"
-                    initial={{ scale: 0.8 }}
-                    animate={{ scale: 1 }}
-                  >
-                    {String(detectedTime.hours).padStart(2, '0')}:
-                    {String(detectedTime.minutes).padStart(2, '0')}:
-                    {String(detectedTime.seconds).padStart(2, '0')}
-                  </motion.p>
-                </div>
-
-                {confidence && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm text-purple-200">
-                      <span>AI Confidence</span>
-                      <span className="font-semibold">{(confidence * 100).toFixed(1)}%</span>
-                    </div>
-                    <div className="relative h-2 bg-purple-900/50 rounded-full overflow-hidden">
-                      <motion.div
-                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-fuchsia-500"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${confidence * 100}%` }}
-                        transition={{ duration: 1 }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {error && (
-                  <Alert variant="destructive" className="mt-4 bg-red-900/50 border-red-500/50 text-red-200">
+            <AnimatePresence mode="wait">
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <Alert variant="destructive" className="bg-red-900/50 border-red-500/50 text-red-200">
                     <AlertCircle className="w-4 h-4 mr-2" />
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                </motion.div>
+              )}
+
+              {detectedTime && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="space-y-8"
+                >
+                  <motion.div 
+                    className="p-6 bg-gradient-to-br from-purple-600/20 to-fuchsia-600/20 rounded-2xl backdrop-blur-sm border border-purple-500/20 shadow-lg"
+                    whileHover={{ scale: 1.02 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                  >
+                    <p className="text-5xl font-bold mb-2 tracking-wider text-center bg-gradient-to-r from-purple-300 to-fuchsia-300 bg-clip-text text-transparent">
+                      {String(detectedTime.hours).padStart(2, '0')}:
+                      {String(detectedTime.minutes).padStart(2, '0')}:
+                      {String(detectedTime.seconds).padStart(2, '0')}
+                    </p>
+                    <p className="text-sm text-center text-purple-300">Detected Time</p>
+                  </motion.div>
+
+                  {confidence && (
+                    <motion.div 
+                      className="space-y-2"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.2 }}
+                    >
+                      <div className="flex justify-between text-sm text-purple-200">
+                        <span>Confidence</span>
+                        <span className="font-semibold">{(confidence * 100).toFixed(1)}%</span>
+                      </div>
+                      <Progress 
+                        value={confidence * 100} 
+                        className="h-2 bg-purple-900/50"
+                      />
+                    </motion.div>
+                  )}
+
+                  {detectionImage && (
+                    <motion.div 
+                      className="rounded-2xl overflow-hidden shadow-lg shadow-purple-500/20"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      <img 
+                        src={detectionImage} 
+                        alt="Detection visualization" 
+                        className="w-full"
+                      />
+                    </motion.div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </motion.div>
       </div>
     </div>
   );
