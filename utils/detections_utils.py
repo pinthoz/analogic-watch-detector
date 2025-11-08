@@ -26,7 +26,17 @@ def get_latest_train_dir(base_path="runs/detect"):
     latest_train = max(train_dirs, key=get_train_number)
     return os.path.join(base_path, latest_train)
 
-def run_detection(image_path, model_path=None, confidence=0.01, save_path=None, zoom=False):
+def run_detection(
+    image_path=None,
+    model_path=None,
+    confidence=0.01,
+    save_path=None,
+    zoom=False,
+    model=None,
+    image=None,
+    save_visualization=True,
+    return_prediction_results=False,
+):
     """
     Run object detection on an image without Non-Maximum Suppression
 
@@ -40,20 +50,41 @@ def run_detection(image_path, model_path=None, confidence=0.01, save_path=None, 
         list: Detections from the image
     """
     # Find model path if not provided
-    if not model_path:
-        model_path = os.path.join(get_latest_train_dir(), "weights/best.pt")
+    if image_path is None and image is None:
+        raise ValueError("Either 'image_path' or 'image' must be provided for detection.")
+
+    if model is None:
+        if not model_path:
+            model_path = os.path.join(get_latest_train_dir(), "weights/best.pt")
+        model = YOLO(model_path)
 
     # Default save path if not specified
-    if not save_path:
-        save_path = os.path.join('results/detections', f'{os.path.splitext(os.path.basename(image_path))[0]}_detection.json')
+    image_identifier = (
+        os.path.splitext(os.path.basename(image_path))[0]
+        if image_path
+        else "uploaded_image"
+    )
+    if not save_path and image_path:
+        save_path = os.path.join('results/detections', f'{image_identifier}_detection.json')
 
     # Ensure detections directory exists
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    os.makedirs('results/image_detections', exist_ok=True)
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    if save_visualization and image_path:
+        os.makedirs('results/image_detections', exist_ok=True)
 
-    # Load model and run detection
-    model = YOLO(model_path)
-    results = model.predict(source=image_path, save=True, save_txt=False, conf=confidence, max_det=50)
+    # Determine prediction source
+    source = image if image is not None else image_path
+
+    # Run detection
+    results = model.predict(
+        source=source,
+        save=save_visualization,
+        save_txt=False,
+        conf=confidence,
+        max_det=50,
+        verbose=False,
+    )
 
     # Convert detections to list format
     detections = []
@@ -84,23 +115,29 @@ def run_detection(image_path, model_path=None, confidence=0.01, save_path=None, 
         detections.append(image_detections)
 
     # Create a visualization only for detections with confidence > 0.1
-    if results:
+    if save_visualization and results:
         filtered_results = results.copy()
-        
+
         # Filtred results with confidence > 0.1
         filtered_results[0].boxes = filtered_results[0].boxes[filtered_results[0].boxes.conf > 0.1]
-        
+
         # Plot the detections
         res_plotted = filtered_results[0].plot()
-        
-        cv2.imwrite(f"results/image_detections/{os.path.splitext(os.path.basename(image_path))[0]}_detection.jpg", res_plotted)
-        print(f"Imagem salva com as detecções em: results/image_detections/{os.path.splitext(os.path.basename(image_path))[0]}")
+
+        output_path = f"results/image_detections/{image_identifier}_detection.jpg"
+        cv2.imwrite(output_path, res_plotted)
+        print(f"Imagem salva com as detecções em: results/image_detections/{image_identifier}")
 
     # Save to JSON file
-    with open(save_path, 'w') as f:
-        json.dump(detections, f, indent=4)
+    if save_path:
+        with open(save_path, 'w') as f:
+            json.dump(detections, f, indent=4)
 
-    print(f"Detections saved to: {save_path}")
+        print(f"Detections saved to: {save_path}")
+
+    if return_prediction_results:
+        return detections, results
+
     return detections
 
 
