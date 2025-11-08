@@ -77,13 +77,11 @@ def predict(image: np.ndarray, confidence: float) -> Tuple[np.ndarray, str]:
     if image is None:
         raise gr.Error("Please upload an image of an analog clock.")
 
-    model = _load_model()
     image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
     detections, results = run_detection(
-        image=None,
+        image=image_bgr,
         image_path=None,
-        model=model,
         confidence=confidence,
         save_path=None,
         save_visualization=False,
