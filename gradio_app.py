@@ -81,7 +81,7 @@ def predict(image: np.ndarray, confidence: float) -> Tuple[np.ndarray, str]:
     image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
     detections, results = run_detection(
-        image=image_bgr,
+        image=None,
         image_path=None,
         model=model,
         confidence=confidence,
