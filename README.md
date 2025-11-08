@@ -73,11 +73,66 @@ The app provides a user-friendly GUI where you can:
 
 This app will always select the last model trained. If you want to use a specific model, you can change the `model_path` variable in the `utils\detections_utils` file in the `run_detection` function.
 
-### 4. Test Set
+### 4. Running the Gradio Demo / Deploying to Hugging Face Spaces
+
+The repository includes a lightweight Gradio interface that is ready for a Hugging Face Space. To start the demo locally run:
+
+```bash
+python gradio_app.py
+```
+
+By default the script loads `yolov8s.pt` from the project root. If you want to use a different checkpoint, set the `MODEL_PATH` environment variable before launching the app:
+
+```bash
+export MODEL_PATH=/path/to/your/weights.pt
+python gradio_app.py
+```
+
+On Hugging Face Spaces create a new **Gradio** Space, upload the repository contents (including the weights file) and set the `gradio_app.py` file as the entry point. The dependencies listed in `requirements.txt` already include `gradio`, so installing them in the Space is enough to run the demo.
+
+#### Deploying to Hugging Face Spaces
+
+You can host the exact same interface on Hugging Face by following these steps:
+
+1. **Install the Hugging Face CLI and log in** (the CLI stores a token that lets you push to Spaces):
+
+   ```bash
+   pip install -U "huggingface_hub[cli]"
+   huggingface-cli login
+   ```
+
+2. **Create a new Space** on <https://huggingface.co/spaces> choosing the **Gradio** SDK. Give it a name such as `username/analogic-watch-detector`.
+
+3. **Clone the empty Space locally** and copy the project files into it:
+
+   ```bash
+   git clone https://huggingface.co/spaces/username/analogic-watch-detector
+   cd analogic-watch-detector
+   rsync -av --exclude '.git' /path/to/this/repository/ ./
+   ```
+
+   Make sure the model weights you want to serve (e.g. `yolov8s.pt`) are also copied into the repository root or uploaded to the Space's "Files" tab.
+
+4. **Tell the Space which file to run** by setting `gradio_app.py` as the entry point in the Space settings (`Files and versions` → `Settings` → `App file`). The provided `requirements.txt` already contains `gradio`, `ultralytics`, and `torch` so no extra dependency configuration is required.
+
+5. **Push the code to Hugging Face** using regular Git commands:
+
+   ```bash
+   git lfs install  # enables large file support for the weight file
+   git add .
+   git commit -m "Deploy analog clock detector"
+   git push
+   ```
+
+   After the push finishes, the Space will automatically build the environment and launch the Gradio application. You can monitor the deployment logs on the Space page.
+
+If you later update the project, repeat steps 3 and 5 to sync your changes with the Space. Hugging Face will redeploy the app each time you push a new commit.
+
+### 5. Test Set
 
 We have provided a test set in the `test_set` folder. You can use this set to evaluate the model's performance. The images in this folder are not part of the training or validation datasets and they are retired from X, Reddit and the last ones are photos taken by us.
 
-### 5. Handling Ground Truths
+### 6. Handling Ground Truths
 If you have a file containing the actual times for the images:
 
 1. Place the file in the ground_truths folder.
