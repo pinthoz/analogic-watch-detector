@@ -72,36 +72,16 @@ def _format_time(prediction: Optional[dict]) -> str:
     return f"Detected time: {hours:02d}:{minutes:02d}:{seconds:02d}."
 
 
-def _ensure_uint8_rgb(image: np.ndarray) -> np.ndarray:
-    """Convert the provided image into an RGB uint8 array.
-
-    Gradio can return float arrays in the range [0, 1] or [0, 255] depending on
-    the installed version. Ultralytics expects uint8 arrays, so we normalise the
-    input accordingly while preserving the original RGB channel order.
-    """
-
-    if image.dtype == np.uint8:
-        return image
-
-    image_float = image.astype(np.float32)
-    max_value = image_float.max() if image_float.size else 0.0
-    if max_value <= 1.0:
-        image_float *= 255.0
-
-    return np.clip(image_float, 0, 255).astype(np.uint8)
-
-
 def predict(image: np.ndarray, confidence: float) -> Tuple[np.ndarray, str]:
     """Run detection on the uploaded image and return the annotated preview."""
     if image is None:
         raise gr.Error("Please upload an image of an analog clock.")
 
     model = _load_model()
-    image_rgb_uint8 = _ensure_uint8_rgb(image)
-    image_bgr = image_rgb_uint8[..., ::-1]
+    image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
     detections, results = run_detection(
-        image=image_bgr,
+        image=None,
         image_path=None,
         model=model,
         confidence=confidence,
@@ -114,7 +94,7 @@ def predict(image: np.ndarray, confidence: float) -> Tuple[np.ndarray, str]:
         return image, "No clock components detected in the provided image."
 
     prediction = process_clock_time(detections, "uploaded_image")
-    annotated = image_rgb_uint8
+    annotated = image
     if results:
         annotated_bgr = results[0].plot()
         annotated = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
