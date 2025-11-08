@@ -55,7 +55,14 @@ def run_detection(
 
     if model is None:
         if not model_path:
-            model_path = os.path.join(get_latest_train_dir(), "weights/best.pt")
+            env_model = os.environ.get("MODEL_PATH")
+            if env_model and os.path.exists(env_model):
+                model_path = env_model
+            else:
+                weights_dir = os.path.join(get_latest_train_dir(), "weights")
+                safetensors_path = os.path.join(weights_dir, "best.safetensors")
+                pt_path = os.path.join(weights_dir, "best.pt")
+                model_path = safetensors_path if os.path.exists(safetensors_path) else pt_path
         model = YOLO(model_path)
 
     # Default save path if not specified

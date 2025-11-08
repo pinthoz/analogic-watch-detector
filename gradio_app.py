@@ -77,6 +77,15 @@ def predict(image: np.ndarray, confidence: float) -> Tuple[np.ndarray, str]:
     if image is None:
         raise gr.Error("Please upload an image of an analog clock.")
 
+    # Basic guard against oversized inputs to reduce DoS risk
+    try:
+        if hasattr(image, "nbytes") and (image.nbytes > 40 * 1024 * 1024):
+            raise gr.Error("Image is too large. Please upload a smaller file.")
+        if image.size and image.size > 20_000_000:
+            raise gr.Error("Image resolution is too high. Please downscale and retry.")
+    except Exception:
+        pass
+
     image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
     detections, results = run_detection(
@@ -156,4 +165,17 @@ def build_interface() -> gr.Blocks:
 
 
 if __name__ == "__main__":
-    build_interface().launch()
+    demo = build_interface()
+    # Limit concurrency and queue size; bind only to localhost; avoid public share
+    try:
+        demo.queue(concurrency_count=1, max_size=8)
+    except TypeError:
+        try:
+            demo.queue(max_size=8)
+        except TypeError:
+            demo.queue()
+
+    try:
+        demo.launch(server_name="127.0.0.1", share=False, allowed_paths=["img"]) 
+    except TypeError:
+        demo.launch(server_name="127.0.0.1", share=False)
